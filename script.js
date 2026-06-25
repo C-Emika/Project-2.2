@@ -28,6 +28,7 @@ let lives = 9;
 let confetti = [];
 let platforms = [];
 let stars = [];
+let dropStartY = null;
 
 const player = {
   x: WIDTH / 2 - 24,
