@@ -12,8 +12,8 @@ const playAgainBtn = document.getElementById('playAgainBtn');
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
-const WORLD_HEIGHT = 2400;
-const GOAL_Y = 160;
+const WORLD_HEIGHT = 3200;
+const GOAL_Y = 120;
 
 const keys = {
   left: false,
@@ -31,13 +31,14 @@ let stars = [];
 
 const player = {
   x: WIDTH / 2 - 24,
-  y: WORLD_HEIGHT - 120,
+  y: WORLD_HEIGHT - 32 - 52,
   width: 48,
   height: 52,
   vx: 0,
   vy: 0,
   speed: 5.2,
   onGround: false,
+  onIce: false,
   jumpCount: 0,
 };
 
@@ -45,10 +46,11 @@ function resetGame() {
   gameState = 'playing';
   lives = 9;
   player.x = WIDTH / 2 - 24;
-  player.y = WORLD_HEIGHT - 120;
+  player.y = WORLD_HEIGHT - 32 - player.height;
   player.vx = 0;
   player.vy = 0;
-  player.onGround = false;
+  player.onGround = true;
+  player.onIce = false;
   player.jumpCount = 0;
   cameraY = WORLD_HEIGHT - HEIGHT;
   confetti = [];
@@ -60,15 +62,21 @@ function resetGame() {
 
 function createPlatforms() {
   platforms = [];
-  platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground' });
-  const rows = [WORLD_HEIGHT - 200, WORLD_HEIGHT - 340, WORLD_HEIGHT - 520, WORLD_HEIGHT - 700, WORLD_HEIGHT - 860, WORLD_HEIGHT - 1040, WORLD_HEIGHT - 1180, WORLD_HEIGHT - 1340, WORLD_HEIGHT - 1500, WORLD_HEIGHT - 1660, WORLD_HEIGHT - 1820, WORLD_HEIGHT - 1980, WORLD_HEIGHT - 2140, WORLD_HEIGHT - 2300];
+  platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0 });
+  const rows = [];
+  for (let y = WORLD_HEIGHT - 180; y > GOAL_Y + 140; y -= 210) {
+    rows.push(y);
+  }
   const column = [40, 200, 360, 520];
   rows.forEach((y, index) => {
     const x = column[index % column.length];
-    const width = 220 - (index * 8);
-    platforms.push({ x, y, width, height: 20, type: 'platform' });
+    const width = Math.max(140, 240 - index * 8);
+    const variant = index % 7 === 2 ? 'breakable' : index % 5 === 3 ? 'ice' : 'normal';
+    platforms.push({ x, y, width, height: 20, type: 'platform', variant, waitTime: 0 });
     if (index % 2 === 0) {
-      platforms.push({ x: WIDTH - x - width, y: y - 120, width: width * 0.75, height: 20, type: 'platform' });
+      const altWidth = Math.max(120, width * 0.75);
+      const altVariant = (index + 3) % 8 === 0 ? 'ice' : 'normal';
+      platforms.push({ x: WIDTH - x - altWidth, y: y - 120, width: altWidth, height: 20, type: 'platform', variant: altVariant, waitTime: 0 });
     }
   });
 }
@@ -82,15 +90,28 @@ function createStars() {
 
 function updateHUD() {
   livesText.textContent = `Lives: ${lives}`;
+  const heightMeters = Math.max(0, Math.round((WORLD_HEIGHT - player.y - player.height) / 10));
+  document.getElementById('height').textContent = `Height: ${heightMeters}m`;
 }
 
 function showScreen(screen) {
-  titleScreen.classList.add('hidden');
-  introScreen.classList.add('hidden');
-  winScreen.classList.add('hidden');
-  if (screen === 'title') titleScreen.classList.remove('hidden');
-  if (screen === 'intro') introScreen.classList.remove('hidden');
-  if (screen === 'win') winScreen.classList.remove('hidden');
+  [titleScreen, introScreen, winScreen].forEach((screenEl) => {
+    screenEl.classList.add('hidden');
+    screenEl.classList.remove('active');
+  });
+
+  if (screen === 'title') {
+    titleScreen.classList.remove('hidden');
+    titleScreen.classList.add('active');
+  }
+  if (screen === 'intro') {
+    introScreen.classList.remove('hidden');
+    introScreen.classList.add('active');
+  }
+  if (screen === 'win') {
+    winScreen.classList.remove('hidden');
+    winScreen.classList.add('active');
+  }
 }
 
 function startGame() {
@@ -143,8 +164,8 @@ function handleConfetti() {
 
 function drawBackground() {
   const progress = 1 - Math.min(Math.max((cameraY / (WORLD_HEIGHT - HEIGHT)) * 1.2, 0), 1);
-  const skyTop = mixColor('#0a1c34', '#c3e8ff', progress);
-  const skyBottom = mixColor('#090d28', '#7cc9ff', progress * 0.8 + 0.2);
+  const skyTop = mixColor('#0b2143', '#1f4c88', progress * 0.65 + 0.1);
+  const skyBottom = mixColor('#d9f3ff', '#9ec9ff', progress * 0.35 + 0.25);
   const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
   gradient.addColorStop(0, skyTop);
   gradient.addColorStop(1, skyBottom);
@@ -220,15 +241,50 @@ function drawPlant(x, y, height, color) {
 function drawPlatforms() {
   platforms.forEach((plat) => {
     const screenY = plat.y - cameraY;
-    ctx.fillStyle = plat.type === 'ground' ? '#2f4e38' : '#ffffffcc';
+    if (plat.type === 'ground') {
+      ctx.fillStyle = '#2f4e38';
+    } else if (plat.variant === 'ice') {
+      ctx.fillStyle = '#c7ecff';
+    } else if (plat.variant === 'breakable') {
+      ctx.fillStyle = '#f7b76c';
+    } else {
+      ctx.fillStyle = '#ffffffcc';
+    }
     ctx.fillRect(plat.x, screenY, plat.width, plat.height);
+
     if (plat.type === 'platform') {
-      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.strokeStyle = plat.variant === 'ice' ? 'rgba(50, 130, 190, 0.55)' : 'rgba(0,0,0,0.15)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(plat.x, screenY);
       ctx.lineTo(plat.x + plat.width, screenY);
       ctx.stroke();
+
+      if (plat.variant === 'ice') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+        ctx.lineWidth = 1;
+        for (let i = 10; i < plat.width; i += 20) {
+          ctx.beginPath();
+          ctx.moveTo(plat.x + i, screenY + 4);
+          ctx.lineTo(plat.x + i + 10, screenY + 10);
+          ctx.stroke();
+        }
+      }
+
+      if (plat.variant === 'breakable') {
+        ctx.strokeStyle = 'rgba(180, 50, 20, 0.7)';
+        ctx.lineWidth = 2;
+        const crackX = plat.x + plat.width / 2;
+        ctx.beginPath();
+        ctx.moveTo(crackX - 12, screenY + 6);
+        ctx.lineTo(crackX, screenY + 12);
+        ctx.lineTo(crackX + 10, screenY + 4);
+        ctx.stroke();
+        if (plat.waitTime > 60) {
+          ctx.fillStyle = 'rgba(255,120,80,0.3)';
+          ctx.fillRect(plat.x, screenY, plat.width, plat.height);
+        }
+      }
     }
   });
 }
@@ -281,30 +337,62 @@ function drawCat() {
 }
 
 function applyPhysics() {
-  player.vx *= 0.92;
-  if (keys.left) player.vx = Math.max(player.vx - 0.7, -player.speed);
-  if (keys.right) player.vx = Math.min(player.vx + 0.7, player.speed);
+  player.onGround = false;
+  player.onIce = false;
+  let standingPlatform = null;
+  const friction = player.onIce ? 0.992 : player.onGround ? 0.92 : 0.98;
+  const acceleration = player.onIce ? 0.55 : 0.7;
+  player.vx *= friction;
+  if (keys.left) player.vx = Math.max(player.vx - acceleration, -player.speed);
+  if (keys.right) player.vx = Math.min(player.vx + acceleration, player.speed);
   player.x += player.vx;
+
   player.vy += 0.9;
-  player.y += player.vy;
+  const oldY = player.y;
+  const newY = player.y + player.vy;
+  const oldBottom = oldY + player.height;
+  const newBottom = newY + player.height;
 
   if (player.x < 0) player.x = 0;
   if (player.x + player.width > WIDTH) player.x = WIDTH - player.width;
 
-  player.onGround = false;
   platforms.forEach((plat) => {
-    if (
-      player.x + player.width > plat.x + 4 &&
-      player.x < plat.x + plat.width - 4 &&
-      player.y + player.height <= plat.y + 20 &&
-      player.y + player.height + player.vy >= plat.y
-    ) {
-      player.y = plat.y - player.height;
+    const isHorizontalOverlap = player.x + player.width > plat.x + 4 && player.x < plat.x + plat.width - 4;
+    if (!isHorizontalOverlap) return;
+
+    const platformTop = plat.y;
+    const platformBottom = plat.y + plat.height;
+    const playerTop = oldY;
+    const newTop = newY;
+
+    if (oldBottom <= platformTop && newBottom >= platformTop && player.vy >= 0) {
+      player.y = platformTop - player.height;
       player.vy = 0;
       player.onGround = true;
       player.jumpCount = 0;
+      if (plat.variant === 'ice') player.onIce = true;
+      if (plat.variant === 'breakable') standingPlatform = plat;
+    } else if (playerTop >= platformBottom && newTop <= platformBottom && player.vy < 0) {
+      player.y = platformBottom;
+      player.vy = 0;
     }
   });
+
+  if (!player.onGround) {
+    player.y = newY;
+  }
+
+  if (standingPlatform) {
+    standingPlatform.waitTime += 1;
+    if (standingPlatform.waitTime >= 120) {
+      platforms = platforms.filter((plat) => plat !== standingPlatform);
+      player.onGround = false;
+    }
+  } else {
+    platforms.forEach((plat) => {
+      if (plat.variant === 'breakable') plat.waitTime = 0;
+    });
+  }
 
   if (player.onGround && keys.jump) {
     player.vy = -18.5;
@@ -326,10 +414,11 @@ function applyPhysics() {
       return;
     }
     player.x = WIDTH / 2 - 24;
-    player.y = WORLD_HEIGHT - 120;
+    player.y = WORLD_HEIGHT - 32 - player.height;
     player.vx = 0;
     player.vy = 0;
     player.jumpCount = 0;
+    player.onGround = true;
     cameraY = WORLD_HEIGHT - HEIGHT;
   }
 
@@ -381,6 +470,7 @@ function update() {
 
 function loop() {
   if (gameState !== 'title') {
+    update();
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     draw();
   }
