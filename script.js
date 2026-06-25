@@ -3,12 +3,17 @@ const ctx = canvas.getContext('2d');
 const titleScreen = document.getElementById('titleScreen');
 const introScreen = document.getElementById('introScreen');
 const winScreen = document.getElementById('winScreen');
+const deathScreen = document.getElementById('deathScreen');
 const hud = document.getElementById('hud');
 const livesText = document.getElementById('lives');
 const startBtn = document.getElementById('startBtn');
 const introBtn = document.getElementById('introBtn');
 const backBtn = document.getElementById('backBtn');
 const playAgainBtn = document.getElementById('playAgainBtn');
+const resetBtn = document.getElementById('resetBtn');
+const quitBtn = document.getElementById('quitBtn');
+const deathPlayAgainBtn = document.getElementById('deathPlayAgainBtn');
+const deathQuitBtn = document.getElementById('deathQuitBtn');
 
 let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
@@ -51,6 +56,7 @@ const assets = {
   catStand: null,
   catWalk1: null,
   catWalk2: null,
+  bgTitle: null,
 };
 let walkFrame = 0;
 let walkTimer = 0;
@@ -129,6 +135,7 @@ function loadAssets(basePath = 'assets') {
     load(`${basePath}/cat_stand.png`).then((i) => (assets.catStand = i)),
     load(`${basePath}/cat_walk1.png`).then((i) => (assets.catWalk1 = i)),
     load(`${basePath}/cat_walk2.png`).then((i) => (assets.catWalk2 = i)),
+    load(`${basePath}/bg_title.png`).then((i) => (assets.bgTitle = i)),
   ]).catch(() => {});
 }
 
@@ -158,7 +165,7 @@ function updateHUD() {
 }
 
 function showScreen(screen) {
-  [titleScreen, introScreen, winScreen].forEach((screenEl) => {
+  [titleScreen, introScreen, winScreen, deathScreen].forEach((screenEl) => {
     screenEl.classList.add('hidden');
     screenEl.classList.remove('active');
   });
@@ -174,6 +181,10 @@ function showScreen(screen) {
   if (screen === 'win') {
     winScreen.classList.remove('hidden');
     winScreen.classList.add('active');
+  }
+  if (screen === 'death') {
+    deathScreen.classList.remove('hidden');
+    deathScreen.classList.add('active');
   }
 }
 
@@ -477,17 +488,15 @@ function applyPhysics() {
 
   // landing and fall-damage detection
   if (!wasOnGround && player.onGround) {
-    // just landed
+    // just landed - lose a life from any fall
     if (dropStartY !== null) {
-      const fallPixels = dropStartY - player.y;
-      const fallThreshold = 30 * 10; // 30 meters -> 300 pixels
-      if (fallPixels >= fallThreshold) {
-        lives -= 1;
-        drawLives();
-        if (lives <= 0) {
-          resetGame();
-          return;
-        }
+      lives -= 1;
+      drawLives();
+      if (lives <= 0) {
+        gameState = 'death';
+        showScreen('death');
+        hud.classList.add('hidden');
+        return;
       }
     }
     dropStartY = null;
@@ -565,8 +574,9 @@ function applyPhysics() {
   if (player.y > WORLD_HEIGHT + 120) {
     lives -= 1;
     if (lives <= 0) {
-      lives = 9;
-      resetGame();
+      gameState = 'death';
+      showScreen('death');
+      hud.classList.add('hidden');
       return;
     }
     player.x = WIDTH / 2 - 24;
@@ -647,6 +657,27 @@ backBtn.addEventListener('click', () => {
 playAgainBtn.addEventListener('click', () => {
   showScreen('none');
   resetGame();
+});
+
+resetBtn.addEventListener('click', () => {
+  resetGame();
+});
+
+quitBtn.addEventListener('click', () => {
+  gameState = 'title';
+  showScreen('title');
+  hud.classList.add('hidden');
+});
+
+deathPlayAgainBtn.addEventListener('click', () => {
+  showScreen('none');
+  resetGame();
+});
+
+deathQuitBtn.addEventListener('click', () => {
+  gameState = 'title';
+  showScreen('title');
+  hud.classList.add('hidden');
 });
 
 window.addEventListener('keydown', (event) => {

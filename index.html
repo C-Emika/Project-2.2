@@ -40,11 +40,26 @@
     </div>
   </div>
 
+  <div id="deathScreen" class="overlay hidden">
+    <div class="panel">
+      <h2>Game Over</h2>
+      <p>The cat has fallen out of the sky.</p>
+      <button id="deathPlayAgainBtn">Try Again</button>
+      <button id="deathQuitBtn">Quit to Title</button>
+    </div>
+  </div>
+
   <canvas id="gameCanvas"></canvas>
   <div id="hud" class="hud hidden">
-    <div id="lives">Lives: 9</div>
-    <div id="height">Height: 0m</div>
-    <div id="goal">Goal: Space</div>
+    <div id="hudLeft">
+      <div id="lives">Lives: 9</div>
+      <div id="height">Height: 0m</div>
+      <div id="goal">Goal: Space</div>
+    </div>
+    <div id="hudRight">
+      <button id="resetBtn" class="hud-button">Reset</button>
+      <button id="quitBtn" class="hud-button">Quit</button>
+    </div>
   </div>
 
   <script src="script.js"></script>
