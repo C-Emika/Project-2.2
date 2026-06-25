@@ -10,8 +10,8 @@ const introBtn = document.getElementById('introBtn');
 const backBtn = document.getElementById('backBtn');
 const playAgainBtn = document.getElementById('playAgainBtn');
 
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
+let WIDTH = canvas.width;
+let HEIGHT = canvas.height;
 const WORLD_HEIGHT = 3200;
 const GOAL_Y = 120;
 
@@ -58,6 +58,19 @@ function resetGame() {
   createStars();
   hud.classList.remove('hidden');
   updateHUD();
+}
+
+function resizeCanvas() {
+  const oldW = WIDTH || 640;
+  const relX = oldW > 0 ? player.x / oldW : 0.5;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  WIDTH = canvas.width;
+  HEIGHT = canvas.height;
+  player.x = Math.max(0, Math.min(relX * WIDTH, WIDTH - player.width));
+  createPlatforms();
+  createStars();
+  cameraY = clamp(player.y - HEIGHT * 0.55, 0, WORLD_HEIGHT - HEIGHT);
 }
 
 function createPlatforms() {
@@ -340,12 +353,6 @@ function applyPhysics() {
   player.onGround = false;
   player.onIce = false;
   let standingPlatform = null;
-  const friction = player.onIce ? 0.992 : player.onGround ? 0.92 : 0.98;
-  const acceleration = player.onIce ? 0.55 : 0.7;
-  player.vx *= friction;
-  if (keys.left) player.vx = Math.max(player.vx - acceleration, -player.speed);
-  if (keys.right) player.vx = Math.min(player.vx + acceleration, player.speed);
-  player.x += player.vx;
 
   player.vy += 0.9;
   const oldY = player.y;
@@ -381,6 +388,21 @@ function applyPhysics() {
   if (!player.onGround) {
     player.y = newY;
   }
+
+  // horizontal movement: acceleration then apply friction based on surface
+  const acceleration = player.onIce ? 0.55 : 0.7;
+  if (keys.left) player.vx = Math.max(player.vx - acceleration, -player.speed);
+  if (keys.right) player.vx = Math.min(player.vx + acceleration, player.speed);
+  // stronger ground friction to reduce sliding; keep ice nearly frictionless
+  if (player.onIce) {
+    player.vx *= 0.992;
+  } else if (player.onGround) {
+    player.vx *= 0.80; // increased friction on normal ground
+    if (Math.abs(player.vx) < 0.12) player.vx = 0; // deadzone to stop micro-sliding
+  } else {
+    player.vx *= 0.98;
+  }
+  player.x += player.vx;
 
   if (standingPlatform) {
     standingPlatform.waitTime += 1;
@@ -501,6 +523,8 @@ window.addEventListener('keyup', (event) => {
 });
 
 showScreen('title');
-createPlatforms();
-createStars();
+// initialize canvas size and content
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+showScreen('title');
 loop();
