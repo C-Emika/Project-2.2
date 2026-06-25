@@ -36,11 +36,24 @@ const player = {
   height: 52,
   vx: 0,
   vy: 0,
-  speed: 5.2,
+  speed: 6.2,
   onGround: false,
   onIce: false,
   jumpCount: 0,
 };
+
+// sprite assets (place your images in `assets/`)
+const assets = {
+  heart: null,
+  catSit: null,
+  catStand: null,
+  catWalk1: null,
+  catWalk2: null,
+};
+let walkFrame = 0;
+let walkTimer = 0;
+let lastMoveTime = Date.now();
+let isSitting = false;
 
 function resetGame() {
   gameState = 'playing';
@@ -101,8 +114,38 @@ function createStars() {
   }
 }
 
+function loadAssets(basePath = 'assets') {
+  const load = (src) => new Promise((res) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = src;
+  });
+  return Promise.all([
+    load(`${basePath}/heart.png`).then((i) => (assets.heart = i)),
+    load(`${basePath}/cat_sit.png`).then((i) => (assets.catSit = i)),
+    load(`${basePath}/cat_stand.png`).then((i) => (assets.catStand = i)),
+    load(`${basePath}/cat_walk1.png`).then((i) => (assets.catWalk1 = i)),
+    load(`${basePath}/cat_walk2.png`).then((i) => (assets.catWalk2 = i)),
+  ]).catch(() => {});
+}
+
+function drawLives() {
+  const livesEl = document.getElementById('lives');
+  if (!livesEl) return;
+  livesEl.innerHTML = '';
+  const total = 9;
+  for (let i = 0; i < total; i += 1) {
+    const img = document.createElement('img');
+    if (assets.heart) img.src = assets.heart.src;
+    img.alt = '♥';
+    if (i >= lives) img.classList.add('empty');
+    livesEl.appendChild(img);
+  }
+}
+
 function updateHUD() {
-  livesText.textContent = `Lives: ${lives}`;
+  drawLives();
   const heightMeters = Math.max(0, Math.round((WORLD_HEIGHT - player.y - player.height) / 10));
   document.getElementById('height').textContent = `Height: ${heightMeters}m`;
 }
@@ -303,10 +346,37 @@ function drawPlatforms() {
 }
 
 function drawCat() {
-  const px = player.x;
-  const py = player.y - cameraY;
+  const px = Math.round(player.x);
+  const py = Math.round(player.y - cameraY);
+  const w = player.width;
+  const h = player.height;
+  const now = Date.now();
+  const moving = keys.left || keys.right;
+  if (moving) lastMoveTime = now;
+
+  isSitting = !moving && (now - lastMoveTime > 2000) && player.onGround;
+
+  let sprite = null;
+  if (isSitting && assets.catSit) sprite = assets.catSit;
+  else if (moving && assets.catWalk1 && assets.catWalk2) {
+    walkTimer += 16;
+    if (walkTimer >= 500) {
+      walkTimer = 0;
+      walkFrame = (walkFrame + 1) % 2;
+    }
+    sprite = walkFrame === 0 ? assets.catWalk1 : assets.catWalk2;
+  } else if (assets.catStand) sprite = assets.catStand;
+
+  if (sprite) {
+    ctx.drawImage(sprite, px, py, w, h);
+    return;
+  }
+
+  // fallback vector cat if sprites aren't available
+  const fx = px;
+  const fy = py;
   ctx.save();
-  ctx.translate(px + player.width / 2, py + player.height / 2);
+  ctx.translate(fx + w / 2, fy + h / 2);
   ctx.fillStyle = '#f7c24b';
   ctx.beginPath();
   ctx.ellipse(0, -6, 22, 24, 0, 0, Math.PI * 2);
@@ -393,7 +463,6 @@ function applyPhysics() {
   const acceleration = player.onIce ? 0.55 : 0.7;
   if (keys.left) player.vx = Math.max(player.vx - acceleration, -player.speed);
   if (keys.right) player.vx = Math.min(player.vx + acceleration, player.speed);
-  // stronger ground friction to reduce sliding; keep ice nearly frictionless
   if (player.onIce) {
     player.vx *= 0.992;
   } else if (player.onGround) {
@@ -402,7 +471,26 @@ function applyPhysics() {
   } else {
     player.vx *= 0.98;
   }
+
+  const oldX = player.x;
   player.x += player.vx;
+
+  // horizontal collision resolution to prevent phasing through platforms
+  platforms.forEach((plat) => {
+    const platTop = plat.y;
+    const platBottom = plat.y + plat.height;
+    const verticalOverlap = player.y + player.height > platTop && player.y < platBottom;
+    if (!verticalOverlap) return;
+    if (oldX + player.width <= plat.x && player.x + player.width > plat.x) {
+      // hit from left
+      player.x = plat.x - player.width;
+      player.vx = 0;
+    } else if (oldX >= plat.x + plat.width && player.x < plat.x + plat.width) {
+      // hit from right
+      player.x = plat.x + plat.width;
+      player.vx = 0;
+    }
+  });
 
   if (standingPlatform) {
     standingPlatform.waitTime += 1;
@@ -416,14 +504,17 @@ function applyPhysics() {
     });
   }
 
+  const scale = Math.max(0.7, HEIGHT / 900);
+  const groundJump = -18.5 * scale;
+  const airJump = -17 * scale;
   if (player.onGround && keys.jump) {
-    player.vy = -18.5;
+    player.vy = groundJump;
     player.jumpCount = 1;
     keys.jump = false;
   }
 
   if (!player.onGround && keys.jump && player.jumpCount < 2) {
-    player.vy = -17;
+    player.vy = airJump;
     player.jumpCount += 1;
     keys.jump = false;
   }
@@ -526,5 +617,10 @@ showScreen('title');
 // initialize canvas size and content
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+// load optional assets then start
+loadAssets().finally(() => {
+  drawLives();
+});
+
 showScreen('title');
 loop();

@@ -124,3 +124,15 @@ button:hover {
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
+
+#lives img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+#lives.empty {
+  opacity: 0.6;
+}
