@@ -147,7 +147,8 @@ function drawLives() {
 
 function updateHUD() {
   drawLives();
-  const heightMeters = Math.max(0, Math.round((WORLD_HEIGHT - player.y - player.height) / 10));
+  // ground should read as 0 meters (ground platform is 32px high)
+  const heightMeters = Math.max(0, Math.round((WORLD_HEIGHT - player.y - player.height - 32) / 10));
   document.getElementById('height').textContent = `Height: ${heightMeters}m`;
 }
 
@@ -421,6 +422,7 @@ function drawCat() {
 }
 
 function applyPhysics() {
+  const wasOnGround = player.onGround;
   player.onGround = false;
   player.onIce = false;
   let standingPlatform = null;
@@ -455,6 +457,27 @@ function applyPhysics() {
       player.vy = 0;
     }
   });
+
+  // landing and fall-damage detection
+  if (!wasOnGround && player.onGround) {
+    // just landed
+    if (dropStartY !== null) {
+      const fallPixels = dropStartY - player.y;
+      const fallThreshold = 30 * 10; // 30 meters -> 300 pixels
+      if (fallPixels >= fallThreshold) {
+        lives -= 1;
+        drawLives();
+        if (lives <= 0) {
+          resetGame();
+          return;
+        }
+      }
+    }
+    dropStartY = null;
+  } else if (wasOnGround && !player.onGround) {
+    // started falling
+    dropStartY = oldY;
+  }
 
   if (!player.onGround) {
     player.y = newY;
