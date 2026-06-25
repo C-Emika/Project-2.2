@@ -37,10 +37,11 @@ const player = {
   height: 52,
   vx: 0,
   vy: 0,
-  speed: 6.2,
+  speed: 7.5,
   onGround: false,
   onIce: false,
   jumpCount: 0,
+  facingRight: true,
 };
 
 // sprite assets (place your images in `assets/`)
@@ -138,7 +139,11 @@ function drawLives() {
   const total = 9;
   for (let i = 0; i < total; i += 1) {
     const img = document.createElement('img');
-    if (assets.heart) img.src = assets.heart.src;
+    if (assets.heart) {
+      img.src = 'assets/heart.png';
+    } else {
+      img.textContent = '♥';
+    }
     img.alt = '♥';
     if (i >= lives) img.classList.add('empty');
     livesEl.appendChild(img);
@@ -354,7 +359,10 @@ function drawCat() {
   const h = player.height;
   const now = Date.now();
   const moving = keys.left || keys.right;
-  if (moving) lastMoveTime = now;
+  if (moving) {
+    lastMoveTime = now;
+    player.facingRight = keys.right || !keys.left;
+  }
 
   isSitting = !moving && (now - lastMoveTime > 2000) && player.onGround;
 
@@ -370,7 +378,16 @@ function drawCat() {
   } else if (assets.catStand) sprite = assets.catStand;
 
   if (sprite) {
-    ctx.drawImage(sprite, px, py, w, h);
+    ctx.save();
+    // Flip horizontally if facing left
+    if (!player.facingRight) {
+      ctx.translate(px + w, py);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sprite, 0, 0, w, h);
+    } else {
+      ctx.drawImage(sprite, px, py, w, h);
+    }
+    ctx.restore();
     return;
   }
 
@@ -530,9 +547,9 @@ function applyPhysics() {
     });
   }
 
-  const scale = Math.max(0.7, HEIGHT / 900);
-  const groundJump = -18.5 * scale;
-  const airJump = -17 * scale;
+  const scale = Math.max(1.0, HEIGHT / 900);
+  const groundJump = -19.5 * scale;
+  const airJump = -17.5 * scale;
   if (player.onGround && keys.jump) {
     player.vy = groundJump;
     player.jumpCount = 1;
