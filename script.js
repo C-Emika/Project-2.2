@@ -520,6 +520,8 @@ function applyPhysics() {
     standingPlatform.waitTime += 1;
     if (standingPlatform.waitTime >= 120) {
       platforms = platforms.filter((plat) => plat !== standingPlatform);
+      // platform broke while player was standing - start falling
+      dropStartY = player.y;
       player.onGround = false;
     }
   } else {
