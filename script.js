@@ -379,8 +379,8 @@ function drawCat() {
 
   if (sprite) {
     ctx.save();
-    // Flip horizontally if facing left
     if (!player.facingRight) {
+      // Flip horizontally: translate to right edge and scale left
       ctx.translate(px + w, py);
       ctx.scale(-1, 1);
       ctx.drawImage(sprite, 0, 0, w, h);
@@ -501,7 +501,7 @@ function applyPhysics() {
   }
 
   // horizontal movement: acceleration then apply friction based on surface
-  const acceleration = player.onIce ? 0.55 : 0.7;
+  const acceleration = player.onIce ? 0.6 : 0.85;
   if (keys.left) player.vx = Math.max(player.vx - acceleration, -player.speed);
   if (keys.right) player.vx = Math.min(player.vx + acceleration, player.speed);
   if (player.onIce) {
