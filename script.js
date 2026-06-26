@@ -19,6 +19,11 @@ const warningTitle = document.getElementById('warningTitle');
 const warningMessage = document.getElementById('warningMessage');
 const warningConfirmBtn = document.getElementById('warningConfirmBtn');
 const warningCancelBtn = document.getElementById('warningCancelBtn');
+const mobileControls = document.getElementById('mobileControls');
+const mobileLeft = document.getElementById('mobileLeft');
+const mobileRight = document.getElementById('mobileRight');
+const mobileDown = document.getElementById('mobileDown');
+const mobileJump = document.getElementById('mobileJump');
 
 let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
@@ -92,6 +97,35 @@ function hideWarningModal() {
     warningOverlay.classList.add('hidden');
     warningOverlay.classList.remove('active');
   }
+}
+
+function setMobileControlsVisibility() {
+  if (!mobileControls) return;
+  const isTouchLike = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  mobileControls.classList.toggle('hidden', !isTouchLike);
+}
+
+function bindMobileControl(buttonEl, onDown, onUp) {
+  if (!buttonEl) return;
+
+  const press = (event) => {
+    event.preventDefault();
+    onDown();
+  };
+  const release = (event) => {
+    event.preventDefault();
+    onUp();
+  };
+
+  buttonEl.addEventListener('pointerdown', press);
+  buttonEl.addEventListener('pointerup', release);
+  buttonEl.addEventListener('pointercancel', release);
+  buttonEl.addEventListener('pointerleave', release);
+
+  // fallback for environments without pointer events
+  buttonEl.addEventListener('touchstart', press, { passive: false });
+  buttonEl.addEventListener('touchend', release, { passive: false });
+  buttonEl.addEventListener('touchcancel', release, { passive: false });
 }
 
 function getSpriteFrame(img) {
@@ -936,6 +970,52 @@ if (warningCancelBtn) {
     hideWarningModal();
   });
 }
+
+bindMobileControl(
+  mobileLeft,
+  () => {
+    keys.left = true;
+  },
+  () => {
+    keys.left = false;
+  }
+);
+
+bindMobileControl(
+  mobileRight,
+  () => {
+    keys.right = true;
+  },
+  () => {
+    keys.right = false;
+  }
+);
+
+bindMobileControl(
+  mobileDown,
+  () => {
+    keys.down = true;
+    if (player.onGround) isSitting = true;
+  },
+  () => {
+    keys.down = false;
+  }
+);
+
+bindMobileControl(
+  mobileJump,
+  () => {
+    keys.jump = true;
+    isSitting = false;
+    lastMoveTime = Date.now();
+  },
+  () => {
+    keys.jump = false;
+  }
+);
+
+setMobileControlsVisibility();
+window.addEventListener('resize', setMobileControlsVisibility);
 // load optional assets then start
 loadAssets().finally(() => {
   drawLives();

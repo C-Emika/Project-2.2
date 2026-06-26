@@ -287,3 +287,41 @@ button:hover {
 .warning-actions {
   margin-top: 8px;
 }
+
+.mobile-controls {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: none;
+  gap: 10px;
+  z-index: 25;
+  padding: 10px;
+  background: rgba(10, 18, 38, 0.58);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  backdrop-filter: blur(2px);
+}
+
+.mobile-control-btn {
+  min-width: 62px;
+  height: 62px;
+  padding: 0;
+  border: 3px solid #2a2a56;
+  border-radius: 2px;
+  background: #52538f;
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  user-select: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .mobile-controls {
+    display: flex;
+  }
+}
