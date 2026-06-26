@@ -11,14 +11,14 @@
 @font-face {
   font-family: 'Vibe Coding Title';
   src: url('assets/fonts/VibeCodingTitle.ttf') format('truetype');
-  font-weight: 700;
+  font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Vibe Coding Body';
   src: url('assets/fonts/VibeCodingBody.ttf') format('truetype');
-  font-weight: 400;
+  font-weight: 700;
   font-style: normal;
 }
 
@@ -30,7 +30,8 @@
 
 html, body {
   height: 100%;
-  font-family: 'Vibe Coding Body', system-ui, sans-serif;
+  /* swap fonts: use the previous title font for body text */
+  font-family: 'Vibe Coding Title', system-ui, sans-serif;
   background: radial-gradient(circle at top, #2a4f8a 0%, #071028 70%);
   color: var(--text);
   overflow: hidden;
@@ -109,7 +110,13 @@ canvas {
 h1, h2 {
   margin-bottom: 16px;
   letter-spacing: 0.06em;
-  font-family: 'Vibe Coding Title', sans-serif;
+  /* use the previous body font for titles (swapped) */
+  font-family: 'Vibe Coding Body', sans-serif;
+}
+
+/* Ensure all text elements explicitly use one of the two supplied fonts */
+p, li, button, .hud, #hud div, .button-row, .screen-panel, ul {
+  font-family: 'Vibe Coding Title', 'Vibe Coding Body', system-ui, sans-serif;
 }
 
 p, li {

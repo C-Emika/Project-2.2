@@ -493,7 +493,7 @@ function applyPhysics() {
   // landing and fall-damage detection
   if (!wasOnGround && player.onGround) {
     if (dropStartY !== null) {
-      const fallPixels = dropStartY - player.y;
+      const fallPixels = player.y - dropStartY;
       const fallThreshold = 50 * 10; // 50 meters -> 500 pixels
       if (fallPixels >= fallThreshold) {
         lives -= 1;
@@ -596,6 +596,18 @@ function applyPhysics() {
   }
 
   cameraY = clamp(player.y - HEIGHT * 0.55, 0, WORLD_HEIGHT - HEIGHT);
+  // Ensure the player's sprite is fully visible in the viewport so it isn't clipped.
+  // calculate sprite height using same scale as drawCat()
+  const spriteH = Math.round(player.height * 1.45);
+  // drawY used in drawCat = player.y - cameraY - (spriteH - player.height)
+  let drawY = player.y - cameraY - (spriteH - player.height);
+  const margin = 8;
+  if (drawY < margin) {
+    cameraY -= (margin - drawY);
+  } else if (drawY + spriteH > HEIGHT - margin) {
+    cameraY += (drawY + spriteH - (HEIGHT - margin));
+  }
+  cameraY = clamp(cameraY, 0, WORLD_HEIGHT - HEIGHT);
   updateHUD();
 }
 
@@ -608,7 +620,7 @@ function drawGoal() {
   ctx.fillStyle = '#ffe66d';
   ctx.fillRect(0, topBar, WIDTH, 10);
   ctx.fillStyle = '#fff';
-  ctx.font = '700 24px Inter, sans-serif';
+  ctx.font = '700 24px "Vibe Coding Body", "Vibe Coding Title", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('Space Gate', WIDTH / 2, topBar - 12);
 }
