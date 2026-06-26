@@ -1,0 +1,254 @@
+:root {
+  --bg-light: #c3e8ff;
+  --bg-mid: #75b8f8;
+  --bg-dark: #0b1444;
+  --text: #fff;
+  --panel: rgba(10, 18, 38, 0.92);
+  --button: #ffb347;
+  --button-hover: #ffc966;
+}
+
+@font-face {
+  font-family: 'Vibe Coding Title';
+  src: url('assets/fonts/VibeCodingTitle.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Vibe Coding Body';
+  src: url('assets/fonts/VibeCodingBody.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  /* swap fonts: use the previous title font for body text */
+  font-family: 'Vibe Coding Title', system-ui, sans-serif;
+  background: radial-gradient(circle at top, #2a4f8a 0%, #071028 70%);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* Make all text bold by default */
+html, body, p, li, button, h1, h2, .hud, #hud div, .button-row, .screen-panel, ul {
+  font-weight: 700;
+}
+
+body {
+  display: block;
+}
+
+canvas {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  background: transparent;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 10;
+  padding: 24px;
+}
+
+#titleScreen,
+#introScreen,
+#deathScreen,
+#winScreen {
+  background: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)), url('assets/bg_title.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.hidden {
+  display: none;
+}
+
+.active {
+  display: flex;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.panel {
+  width: min(760px, 90%);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  text-align: center;
+  box-shadow: none;
+}
+
+.screen-panel {
+  width: min(760px, 90%);
+  max-width: 760px;
+  padding: 32px 28px;
+  background: rgba(10, 18, 38, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.screen-panel h1 {
+  font-size: clamp(36px, 7vw, 84px);
+  line-height: 1.02;
+}
+
+.screen-panel h2 {
+  font-size: clamp(28px, 4.5vw, 54px);
+}
+
+.screen-panel p {
+  font-size: clamp(16px, 2.6vw, 20px);
+}
+
+h1, h2 {
+  margin-bottom: 16px;
+  letter-spacing: 0.06em;
+  /* use the previous body font for titles (swapped) */
+  font-family: 'Vibe Coding Body', sans-serif;
+}
+
+/* Ensure all text elements explicitly use one of the two supplied fonts */
+p, li, button, .hud, #hud div, .button-row, .screen-panel, ul {
+  font-family: 'Vibe Coding Title', 'Vibe Coding Body', system-ui, sans-serif;
+}
+
+p, li {
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+ul {
+  text-align: left;
+  margin: 0 auto 24px;
+  max-width: 420px;
+  padding-left: 18px;
+}
+
+.button-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+button + button {
+  min-width: 140px;
+}
+
+button {
+  background: #7fc7ff;
+  border: none;
+  color: #041b35;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease;
+  min-width: 140px;
+}
+
+button {
+  font-weight: 700;
+  font-size: clamp(14px, 2.2vw, 18px);
+  padding: 16px 30px;
+}
+
+button:hover {
+  background: #a5dbff;
+  transform: translateY(-2px);
+}
+
+#hud {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#hudLeft {
+  display: flex;
+  gap: 18px;
+  pointer-events: auto;
+}
+
+/* center the HUD items' text (height and goal) horizontally */
+#hudLeft > div {
+  text-align: center;
+  min-width: 84px;
+}
+
+#hudRight {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+#hud div {
+  background: rgba(10, 18, 38, 0.7);
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.hud-button {
+  background: #7fc7ff;
+  border: none;
+  color: #041b35;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease;
+  pointer-events: auto;
+}
+
+.hud-button:hover {
+  background: #a5dbff;
+  transform: translateY(-2px);
+}
+
+#lives img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+#lives img.empty {
+  opacity: 0.4;
+  filter: grayscale(1);
+}

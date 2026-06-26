@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cat Climb</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="titleScreen" class="overlay active">
+      <div class="screen-panel">
+        <h1>Cat Climb</h1>
+        <p>Guide the cat safely through a dreamy sky climb.</p>
+        <div class="button-row">
+          <button id="startBtn">Start</button>
+          <button id="introBtn">Intro</button>
+        </div>
+      </div>
+  </div>
+
+  <div id="introScreen" class="overlay hidden">
+      <div class="screen-panel">
+        <h2>How to Play</h2>
+        <ul>
+          <li>Use <strong>Left / Right</strong> arrow keys or <strong>A / D</strong> to move.</li>
+          <li>Press <strong>Up</strong> arrow or <strong>W</strong> / <strong>Space</strong> to jump.</li>
+          <li>The cat can double jump to reach higher platforms.</li>
+          <li>Use 9 lives to climb from the ground to the top of space.</li>
+        </ul>
+        <button id="backBtn">Back</button>
+      </div>
+  </div>
+
+  <div id="winScreen" class="overlay hidden">
+      <div class="screen-panel">
+        <h2>Victory!</h2>
+        <p>The cat reached space. Congratulations!</p>
+        <button id="playAgainBtn">Play Again</button>
+      </div>
+  </div>
+
+  <div id="deathScreen" class="overlay hidden">
+      <div class="screen-panel">
+        <h2>Game Over</h2>
+        <p>The cat has fallen out of the sky.</p>
+        <div class="button-row">
+          <button id="deathPlayAgainBtn">Try Again</button>
+          <button id="deathQuitBtn">Quit to Title</button>
+        </div>
+      </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud" class="hud hidden">
+    <div id="hudLeft">
+      <div id="lives">Lives: 9</div>
+      <div id="height">Height: 0m</div>
+      <div id="goal">Goal: Space</div>
+    </div>
+    <div id="hudRight">
+      <button id="resetBtn" class="hud-button">Reset</button>
+      <button id="quitBtn" class="hud-button">Quit</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
