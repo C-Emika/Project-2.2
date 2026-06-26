@@ -37,6 +37,11 @@ html, body {
   overflow: hidden;
 }
 
+/* Make all text bold by default */
+html, body, p, li, button, h1, h2, .hud, #hud div, .button-row, .screen-panel, ul {
+  font-weight: 700;
+}
+
 body {
   display: block;
 }
@@ -107,6 +112,19 @@ canvas {
   text-align: center;
 }
 
+.screen-panel h1 {
+  font-size: clamp(36px, 7vw, 84px);
+  line-height: 1.02;
+}
+
+.screen-panel h2 {
+  font-size: clamp(28px, 4.5vw, 54px);
+}
+
+.screen-panel p {
+  font-size: clamp(16px, 2.6vw, 20px);
+}
+
 h1, h2 {
   margin-bottom: 16px;
   letter-spacing: 0.06em;
@@ -154,6 +172,12 @@ button {
   min-width: 140px;
 }
 
+button {
+  font-weight: 700;
+  font-size: clamp(14px, 2.2vw, 18px);
+  padding: 16px 30px;
+}
+
 button:hover {
   background: #a5dbff;
   transform: translateY(-2px);
@@ -177,6 +201,12 @@ button:hover {
   display: flex;
   gap: 18px;
   pointer-events: auto;
+}
+
+/* center the HUD items' text (height and goal) horizontally */
+#hudLeft > div {
+  text-align: center;
+  min-width: 84px;
 }
 
 #hudRight {

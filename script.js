@@ -380,6 +380,8 @@ function drawCat() {
     player.facingRight = keys.right || !keys.left;
   }
 
+  // Sitting: only set when on ground and idle for >2s
+  const wasSitting = isSitting;
   isSitting = !moving && (now - lastMoveTime > 2000) && player.onGround;
 
   let sprite = null;
@@ -578,6 +580,11 @@ function applyPhysics() {
     keys.jump = false;
   }
 
+  // If jump is initiated while sitting, transition to standing before applying jump
+  if (wasSitting && keys.jump) {
+    isSitting = false;
+  }
+
   if (player.y > WORLD_HEIGHT + 120) {
     lives -= 1;
     if (lives <= 0) {
@@ -617,7 +624,8 @@ function clamp(value, min, max) {
 
 function drawGoal() {
   const topBar = GOAL_Y - cameraY;
-  ctx.fillStyle = '#ffe66d';
+  // use the same light blue as buttons for the space gate line
+  ctx.fillStyle = '#7fc7ff';
   ctx.fillRect(0, topBar, WIDTH, 10);
   ctx.fillStyle = '#fff';
   ctx.font = '700 24px "Vibe Coding Body", "Vibe Coding Title", sans-serif';
