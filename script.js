@@ -691,41 +691,57 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-startBtn.addEventListener('click', () => {
-  showScreen('none');
-  startGame();
-});
-introBtn.addEventListener('click', () => {
-  showScreen('intro');
-});
-backBtn.addEventListener('click', () => {
-  showScreen('title');
-});
-playAgainBtn.addEventListener('click', () => {
-  showScreen('none');
-  resetGame();
-});
+if (startBtn) {
+  startBtn.addEventListener('click', () => {
+    showScreen('none');
+    startGame();
+  });
+}
+if (introBtn) {
+  introBtn.addEventListener('click', () => {
+    showScreen('intro');
+  });
+}
+if (backBtn) {
+  backBtn.addEventListener('click', () => {
+    showScreen('title');
+  });
+}
+if (playAgainBtn) {
+  playAgainBtn.addEventListener('click', () => {
+    showScreen('none');
+    resetGame();
+  });
+}
 
-resetBtn.addEventListener('click', () => {
-  resetGame();
-});
+if (resetBtn) {
+  resetBtn.addEventListener('click', () => {
+    resetGame();
+  });
+}
 
-quitBtn.addEventListener('click', () => {
-  gameState = 'title';
-  showScreen('title');
-  hud.classList.add('hidden');
-});
+if (quitBtn) {
+  quitBtn.addEventListener('click', () => {
+    gameState = 'title';
+    showScreen('title');
+    hud.classList.add('hidden');
+  });
+}
 
-deathPlayAgainBtn.addEventListener('click', () => {
-  showScreen('none');
-  resetGame();
-});
+if (deathPlayAgainBtn) {
+  deathPlayAgainBtn.addEventListener('click', () => {
+    showScreen('none');
+    resetGame();
+  });
+}
 
-deathQuitBtn.addEventListener('click', () => {
-  gameState = 'title';
-  showScreen('title');
-  hud.classList.add('hidden');
-});
+if (deathQuitBtn) {
+  deathQuitBtn.addEventListener('click', () => {
+    gameState = 'title';
+    showScreen('title');
+    hud.classList.add('hidden');
+  });
+}
 
 window.addEventListener('keydown', (event) => {
   handleInput(event, true);
