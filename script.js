@@ -631,13 +631,15 @@ function applyPhysics() {
   }
 
   // horizontal movement: acceleration then apply friction based on surface
-  const acceleration = player.onIce ? 0.6 : 0.85;
-  if (keys.left) player.vx = Math.max(player.vx - acceleration, -player.speed);
-  if (keys.right) player.vx = Math.min(player.vx + acceleration, player.speed);
+  const isCrouching = keys.down && player.onGround;
+  const maxGroundSpeed = isCrouching ? player.speed * 0.15 : player.speed;
+  const acceleration = player.onIce ? 0.6 : isCrouching ? 0.22 : 0.85;
+  if (keys.left) player.vx = Math.max(player.vx - acceleration, -maxGroundSpeed);
+  if (keys.right) player.vx = Math.min(player.vx + acceleration, maxGroundSpeed);
   if (player.onIce) {
     player.vx *= 0.992;
   } else if (player.onGround) {
-    player.vx *= 0.80; // increased friction on normal ground
+    player.vx *= isCrouching ? 0.55 : 0.80; // crouch applies stronger drag
     if (Math.abs(player.vx) < 0.12) player.vx = 0; // deadzone to stop micro-sliding
   } else {
     player.vx *= 0.98;
