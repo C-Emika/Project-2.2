@@ -248,7 +248,7 @@ function handleConfetti() {
 function drawBackground() {
   const progress = 1 - Math.min(Math.max((cameraY / (WORLD_HEIGHT - HEIGHT)) * 1.2, 0), 1);
   const skyTop = mixColor('#0b2143', '#52538f', progress * 0.65 + 0.1);
-  const skyBottom = mixColor('#99bce8', 'rgb(188, 218, 255)', progress * 0.35 + 0.25);
+  const skyBottom = mixColor('#99bce8', '#779bc8', progress * 0.35 + 0.25);
   const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
   gradient.addColorStop(0, skyTop);
   gradient.addColorStop(1, skyBottom);
