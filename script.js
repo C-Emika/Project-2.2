@@ -531,40 +531,49 @@ function createPlatforms() {
   platforms = [];
   coins = [];
   platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
-  const rows = [];
-  for (let y = WORLD_HEIGHT - 160; y > GOAL_Y + 80; y -= 160) {
-    rows.push(y);
-  }
-  const columnCount = Math.max(5, Math.floor(WIDTH / 180));
-  const column = Array.from({ length: columnCount }, (_, i) => {
-    const t = columnCount === 1 ? 0 : i / (columnCount - 1);
-    return Math.round(40 + t * Math.max(0, WIDTH - 120));
-  });
-  rows.forEach((y, index) => {
-    const x = column[index % column.length];
-    const width = Math.max(140, 280 - index * 7);
+
+  const minGapY = 130;
+  const maxGapY = 168;
+  const maxStepX = 190;
+  let y = WORLD_HEIGHT - 180;
+  let mainX = Math.max(16, WIDTH / 2 - 120);
+
+  while (y > GOAL_Y + 90) {
+    const width = Math.max(120, 260 - ((WORLD_HEIGHT - y) / 85));
+    const rawShift = (Math.random() * 2 - 1) * maxStepX;
+    mainX = Math.max(16, Math.min(mainX + rawShift, WIDTH - width - 16));
+
     const altitude = WORLD_HEIGHT - y;
     const biome = altitude < 3500 ? 'earth' : altitude < 7300 ? 'cloud' : 'space';
     const flowerDensity = Math.max(0, 1 - altitude / 4500);
-    const variant = index % 7 === 2 ? 'breakable' : index % 5 === 3 ? 'ice' : 'normal';
-    platforms.push({ x, y, width, height: 24, type: 'platform', variant, waitTime: 0, biome, flowerDensity });
-    if (Math.random() < 0.45) {
-      coins.push({ x: x + width / 2, y: y - 16, collected: false });
+    const variantRoll = Math.random();
+    const variant = variantRoll < 0.14 ? 'breakable' : variantRoll < 0.28 ? 'ice' : 'normal';
+
+    platforms.push({ x: mainX, y, width, height: 24, type: 'platform', variant, waitTime: 0, biome, flowerDensity });
+    if (Math.random() < 0.5) {
+      coins.push({ x: mainX + width / 2, y: y - 16, collected: false });
     }
-    if (index % 2 === 0) {
-      const altWidth = Math.max(110, width * 0.7);
-      const altVariant = (index + 3) % 8 === 0 ? 'ice' : 'normal';
-      const altX = WIDTH - x - altWidth;
-      const altY = y - 110;
-      const altAltitude = WORLD_HEIGHT - altY;
-      const altBiome = altAltitude < 3500 ? 'earth' : altAltitude < 7300 ? 'cloud' : 'space';
-      const altFlowerDensity = Math.max(0, 1 - altAltitude / 4500);
-      platforms.push({ x: altX, y: altY, width: altWidth, height: 24, type: 'platform', variant: altVariant, waitTime: 0, biome: altBiome, flowerDensity: altFlowerDensity });
-      if (Math.random() < 0.35) {
-        coins.push({ x: altX + altWidth / 2, y: altY - 16, collected: false });
+
+    // optional secondary platform, still reachable from the main path
+    if (Math.random() < 0.48) {
+      const sideWidth = Math.max(110, width * (0.62 + Math.random() * 0.24));
+      const sideOffsetX = (Math.random() < 0.5 ? -1 : 1) * (70 + Math.random() * 110);
+      const sideX = Math.max(16, Math.min(mainX + sideOffsetX, WIDTH - sideWidth - 16));
+      const sideRise = 24 + Math.random() * 74;
+      const sideY = Math.max(GOAL_Y + 84, y - sideRise);
+      const sideAlt = WORLD_HEIGHT - sideY;
+      const sideBiome = sideAlt < 3500 ? 'earth' : sideAlt < 7300 ? 'cloud' : 'space';
+      const sideFlowerDensity = Math.max(0, 1 - sideAlt / 4500);
+      const sideRoll = Math.random();
+      const sideVariant = sideRoll < 0.1 ? 'breakable' : sideRoll < 0.24 ? 'ice' : 'normal';
+      platforms.push({ x: sideX, y: sideY, width: sideWidth, height: 24, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity });
+      if (Math.random() < 0.36) {
+        coins.push({ x: sideX + sideWidth / 2, y: sideY - 16, collected: false });
       }
     }
-  });
+
+    y -= minGapY + Math.random() * (maxGapY - minGapY);
+  }
   createSpaceHazards();
 }
 
@@ -587,12 +596,18 @@ function loadAssets(basePath = 'assets') {
     img.onerror = () => res(null);
     img.src = src;
   });
+
+  const loadFirst = (names) => names.reduce(
+    (p, name) => p.then((img) => img || load(`${basePath}/${name}`)),
+    Promise.resolve(null)
+  );
+
   return Promise.all([
     load(`${basePath}/heart.png`).then((i) => (assets.heart = i)),
-    load(`${basePath}/cat_sit.png`).then((i) => (assets.catSit = i)),
-    load(`${basePath}/cat_stand.png`).then((i) => (assets.catStand = i)),
-    load(`${basePath}/cat_walk1.png`).then((i) => (assets.catWalk1 = i)),
-    load(`${basePath}/cat_walk2.png`).then((i) => (assets.catWalk2 = i)),
+    loadFirst(['cat_sitNew.png', 'cat_sit_new.png', 'cat_sitNEW.png', 'cat_sit.png']).then((i) => (assets.catSit = i)),
+    loadFirst(['cat_standNew.png', 'cat_stand_new.png', 'cat_standNEW.png', 'cat_stand.png']).then((i) => (assets.catStand = i)),
+    loadFirst(['cat_walk1New.png', 'cat_walk1_new.png', 'cat_walk1NEW.png', 'cat_walk1.png']).then((i) => (assets.catWalk1 = i)),
+    loadFirst(['cat_walk2New.png', 'cat_walk2_new.png', 'cat_walk2NEW.png', 'cat_walk2.png']).then((i) => (assets.catWalk2 = i)),
     load(`${basePath}/bg_title.png`).then((i) => (assets.bgTitle = i)),
   ]).catch(() => {});
 }
@@ -789,7 +804,7 @@ function drawPlatforms() {
   platforms.forEach((plat) => {
     const screenY = plat.y - cameraY;
     if (plat.type === 'ground') {
-      ctx.fillStyle = '#2f4e38';
+      ctx.fillStyle = '#6b4b2d';
     } else {
       if (plat.biome === 'earth') {
         ctx.fillStyle = '#6b4b2d';
@@ -800,6 +815,20 @@ function drawPlatforms() {
       }
     }
     ctx.fillRect(plat.x, screenY, plat.width, plat.height);
+
+    if (plat.type === 'ground') {
+      ctx.fillStyle = '#3f8c47';
+      ctx.fillRect(plat.x, screenY, plat.width, 10);
+      for (let i = 0; i < WIDTH; i += 38) {
+        const fx = i + 12;
+        const fy = screenY + 3;
+        ctx.fillStyle = '#f4d35e';
+        ctx.fillRect(fx, fy, 2, 2);
+        ctx.fillStyle = '#f26f8b';
+        ctx.fillRect(fx - 2, fy + 2, 2, 2);
+        ctx.fillRect(fx + 2, fy + 2, 2, 2);
+      }
+    }
 
     if (plat.biome === 'earth') {
       ctx.fillStyle = '#3f8c47';
