@@ -8,6 +8,20 @@
   --button-hover: #ffc966;
 }
 
+@font-face {
+  font-family: 'Vibe Coding Title';
+  src: url('assets/fonts/VibeCodingTitle.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Vibe Coding Body';
+  src: url('assets/fonts/VibeCodingBody.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -43,6 +57,7 @@ canvas {
   justify-content: center;
   background: rgba(0, 0, 0, 0.55);
   z-index: 10;
+  padding: 24px;
 }
 
 #titleScreen,
@@ -76,6 +91,21 @@ canvas {
   box-shadow: none;
 }
 
+.screen-panel {
+  width: min(760px, 90%);
+  max-width: 760px;
+  padding: 32px 28px;
+  background: rgba(10, 18, 38, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
 h1, h2 {
   margin-bottom: 16px;
   letter-spacing: 0.06em;
@@ -101,6 +131,10 @@ ul {
   margin-top: 20px;
 }
 
+button + button {
+  min-width: 140px;
+}
+
 button {
   background: #7fc7ff;
   border: none;
@@ -110,6 +144,7 @@ button {
   font-size: 1rem;
   cursor: pointer;
   transition: transform 0.16s ease, background 0.16s ease;
+  min-width: 140px;
 }
 
 button:hover {
