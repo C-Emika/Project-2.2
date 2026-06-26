@@ -79,6 +79,12 @@ function resetGame() {
   createStars();
   hud.classList.remove('hidden');
   updateHUD();
+  // force an immediate draw so sprites load and positioning updates
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  drawBackground();
+  drawPlants();
+  drawPlatforms();
+  drawCat();
 }
 
 function resizeCanvas() {
@@ -241,8 +247,8 @@ function handleConfetti() {
 
 function drawBackground() {
   const progress = 1 - Math.min(Math.max((cameraY / (WORLD_HEIGHT - HEIGHT)) * 1.2, 0), 1);
-  const skyTop = mixColor('#0b2143', '#1f4c88', progress * 0.65 + 0.1);
-  const skyBottom = mixColor('#d9f3ff', '#9ec9ff', progress * 0.35 + 0.25);
+  const skyTop = mixColor('#0b2143', '#52538f', progress * 0.65 + 0.1);
+  const skyBottom = mixColor('#99bce8', 'rgb(188, 218, 255)', progress * 0.35 + 0.25);
   const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
   gradient.addColorStop(0, skyTop);
   gradient.addColorStop(1, skyBottom);
@@ -369,10 +375,10 @@ function drawPlatforms() {
 function drawCat() {
   const px = Math.round(player.x);
   const py = Math.round(player.y - cameraY);
-  const w = Math.round(player.width * 1.45);
-  const h = Math.round(player.height * 1.45);
-  const drawX = px - Math.round((w - player.width) / 2);
-  const drawY = py - Math.round(h - player.height);
+  const desiredW = Math.round(player.width * 1.45);
+  const desiredH = Math.round(player.height * 1.45);
+  // compute draw position so the sprite bottom aligns with player's bottom
+  const bottomOnScreen = py + player.height;
   const now = Date.now();
   const moving = keys.left || keys.right;
   if (moving) {
@@ -396,22 +402,22 @@ function drawCat() {
   } else if (assets.catStand) sprite = assets.catStand;
 
   if (sprite) {
-    // Draw sprite using its natural size and scale to target height so frames
-    // with trimmed padding don't appear cropped. Align sprite bottom to player bottom.
-    const srcW = sprite.width || w;
-    const srcH = sprite.height || h;
-    const scale = h / srcH;
-    const dw = Math.round(srcW * scale);
-    const dh = Math.round(srcH * scale);
-    const dx = Math.round(player.x + player.width / 2 - dw / 2);
-    const dy = Math.round(player.y - cameraY - dh + player.height);
+    // scale the image using its natural size so any internal trimming in the
+    // PNG isn't accidentally clipped by incorrect draw offsets
+    const imgW = sprite.width || sprite.naturalWidth;
+    const imgH = sprite.height || sprite.naturalHeight;
+    const scale = Math.min(desiredW / imgW, desiredH / imgH);
+    const drawW = Math.round(imgW * scale);
+    const drawH = Math.round(imgH * scale);
+    const drawX = Math.round(player.x + (player.width - drawW) / 2);
+    const drawY = Math.round((player.y + player.height) - drawH - cameraY);
     ctx.save();
     if (!player.facingRight) {
-      ctx.translate(dx + dw, dy);
+      ctx.translate(drawX + drawW, drawY);
       ctx.scale(-1, 1);
-      ctx.drawImage(sprite, 0, 0, srcW, srcH, 0, 0, dw, dh);
+      ctx.drawImage(sprite, 0, 0, imgW, imgH, 0, 0, drawW, drawH);
     } else {
-      ctx.drawImage(sprite, 0, 0, srcW, srcH, dx, dy, dw, dh);
+      ctx.drawImage(sprite, 0, 0, imgW, imgH, drawX, drawY, drawW, drawH);
     }
     ctx.restore();
     return;
@@ -476,8 +482,13 @@ function applyPhysics() {
   const oldBottom = oldY + player.height;
   const newBottom = newY + player.height;
 
-  if (player.x < 0) player.x = 0;
-  if (player.x + player.width > WIDTH) player.x = WIDTH - player.width;
+  // prevent horizontal sprite clipping by keeping extra sprite padding inside viewport
+  const drawW = Math.round(player.width * 1.45);
+  const padX = Math.round((drawW - player.width) / 2);
+  const minPlayerX = padX;
+  const maxPlayerX = Math.max(padX, WIDTH - player.width - padX);
+  if (player.x < minPlayerX) player.x = minPlayerX;
+  if (player.x > maxPlayerX) player.x = maxPlayerX;
 
   platforms.forEach((plat) => {
     const isHorizontalOverlap = player.x + player.width > plat.x + 4 && player.x < plat.x + plat.width - 4;
@@ -652,7 +663,7 @@ function handleInput(event, isDown) {
 }
 
 function draw() {
-  // Always draw the background and HUD layers so overlays sit on top.
+  if (gameState === 'title') return;
   drawBackground();
   drawPlants();
   drawPlatforms();
@@ -671,10 +682,12 @@ function update() {
 }
 
 function loop() {
-  // Clear and always render frame; only update physics when playing.
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  if (gameState === 'playing') update();
-  draw();
+  if (gameState !== 'title') {
+    update();
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    draw();
+  }
+  if (gameState === 'win') handleConfetti();
   requestAnimationFrame(loop);
 }
 
