@@ -51,8 +51,13 @@ let confetti = [];
 let platforms = [];
 let stars = [];
 let coins = [];
+let coinBursts = [];
 let coinBalance = 0;
+let spaceHazards = [];
+let damageCooldown = 0;
 let dropStartY = null;
+let coyoteFrames = 0;
+let jumpBufferFrames = 0;
 
 const player = {
   x: WIDTH / 2 - 24,
@@ -94,11 +99,14 @@ const hatCatalog = [
   { id: 'wizard', label: 'Wizard Hat', cost: 40, color: '#7f79df' },
 ];
 
+let audioCtx = null;
+
 function applyPixelRenderSettings() {
   ctx.imageSmoothingEnabled = false;
 }
 
 function showWarningModal(title, message, onConfirm) {
+  closeShop();
   warningAction = onConfirm;
   if (warningTitle) warningTitle.textContent = title;
   if (warningMessage) warningMessage.textContent = message;
@@ -121,12 +129,55 @@ function updateCoinsHUD() {
   if (shopCoins) shopCoins.textContent = `Coins: ${coinBalance}`;
 }
 
+function createHatPreview(hatId) {
+  const preview = document.createElement('div');
+  preview.className = 'hat-preview';
+  const base = document.createElement('div');
+  base.className = 'hat-preview-base';
+  preview.appendChild(base);
+
+  if (hatId === 'none') {
+    const none = document.createElement('div');
+    none.className = 'hat-preview-none';
+    none.textContent = 'No Hat';
+    preview.appendChild(none);
+    return preview;
+  }
+
+  if (hatId === 'cap') {
+    const a = document.createElement('div');
+    a.className = 'hat-preview-piece hat-preview-cap-main';
+    const b = document.createElement('div');
+    b.className = 'hat-preview-piece hat-preview-cap-brim';
+    preview.append(a, b);
+  } else if (hatId === 'crown') {
+    const a = document.createElement('div');
+    a.className = 'hat-preview-piece hat-preview-crown-band';
+    const b = document.createElement('div');
+    b.className = 'hat-preview-piece hat-preview-crown-tip left';
+    const c = document.createElement('div');
+    c.className = 'hat-preview-piece hat-preview-crown-tip mid';
+    const d = document.createElement('div');
+    d.className = 'hat-preview-piece hat-preview-crown-tip right';
+    preview.append(a, b, c, d);
+  } else if (hatId === 'wizard') {
+    const a = document.createElement('div');
+    a.className = 'hat-preview-piece hat-preview-wizard-cone';
+    const b = document.createElement('div');
+    b.className = 'hat-preview-piece hat-preview-wizard-brim';
+    preview.append(a, b);
+  }
+  return preview;
+}
+
 function renderShop() {
   if (!shopItems) return;
   shopItems.innerHTML = '';
   hatCatalog.forEach((hat) => {
     const card = document.createElement('div');
     card.className = 'shop-item';
+
+    card.appendChild(createHatPreview(hat.id));
 
     const title = document.createElement('h3');
     title.textContent = hat.label;
@@ -160,6 +211,7 @@ function renderShop() {
 
 function openShop() {
   if (!shopOverlay) return;
+  hideWarningModal();
   renderShop();
   updateCoinsHUD();
   shopOverlay.classList.remove('hidden');
@@ -194,6 +246,115 @@ function drawHatAt(x, y, w, h) {
     ctx.closePath();
     ctx.fill();
   }
+}
+
+function playCoinSfx() {
+  try {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audioCtx = new Ctx();
+    }
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(620, t);
+    osc.frequency.exponentialRampToValueAtTime(980, t + 0.08);
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  } catch {
+    // Audio can fail on some browsers/devices before user gesture.
+  }
+}
+
+function spawnCoinBurst(x, y) {
+  const pieces = [];
+  for (let i = 0; i < 8; i += 1) {
+    pieces.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 2.8,
+      vy: -Math.random() * 2.4 - 0.6,
+      life: 22 + Math.floor(Math.random() * 10),
+      maxLife: 30,
+    });
+  }
+  coinBursts.push(pieces);
+}
+
+function drawCoinBursts() {
+  coinBursts = coinBursts.filter((burst) => {
+    let anyAlive = false;
+    burst.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.12;
+      p.life -= 1;
+      if (p.life > 0) {
+        anyAlive = true;
+        const sy = p.y - cameraY;
+        if (sy > -10 && sy < HEIGHT + 10) {
+          const alpha = Math.max(0, p.life / p.maxLife);
+          ctx.fillStyle = `rgba(255, 216, 77, ${alpha})`;
+          ctx.fillRect(Math.round(p.x - 2), Math.round(sy - 2), 4, 4);
+        }
+      }
+    });
+    return anyAlive;
+  });
+}
+
+function createSpaceHazards() {
+  spaceHazards = [];
+  platforms.forEach((plat) => {
+    if (plat.type !== 'platform' || plat.biome !== 'space') return;
+    if (Math.random() > 0.18) return;
+    const range = Math.max(40, Math.min(220, plat.width * 0.45));
+    const cx = plat.x + plat.width / 2;
+    spaceHazards.push({
+      x: cx,
+      y: plat.y - 26,
+      w: 16,
+      h: 14,
+      vx: Math.random() < 0.5 ? 0.6 : -0.6,
+      minX: cx - range,
+      maxX: cx + range,
+    });
+  });
+}
+
+function drawSpaceHazards() {
+  spaceHazards.forEach((hz) => {
+    const sy = hz.y - cameraY;
+    if (sy < -40 || sy > HEIGHT + 40) return;
+    ctx.fillStyle = '#8f96ab';
+    ctx.fillRect(Math.round(hz.x - hz.w / 2), Math.round(sy - hz.h / 2), hz.w, hz.h);
+    ctx.fillStyle = '#c2c7d5';
+    ctx.fillRect(Math.round(hz.x - hz.w / 4), Math.round(sy - hz.h / 4), Math.round(hz.w / 2), Math.round(hz.h / 2));
+  });
+}
+
+function hitPlayer() {
+  if (damageCooldown > 0) return;
+  damageCooldown = 90;
+  lives -= 1;
+  if (lives <= 0) {
+    gameState = 'death';
+    showScreen('death');
+    hud.classList.add('hidden');
+    return;
+  }
+  player.x = WIDTH / 2 - 24;
+  player.y = Math.max(GOAL_Y + 140, WORLD_HEIGHT - 32 - player.height - 220);
+  player.vx = 0;
+  player.vy = 0;
+  player.jumpCount = 0;
+  player.onGround = false;
 }
 
 function setMobileControlsVisibility() {
@@ -284,6 +445,7 @@ function saveProgress() {
     },
     platforms: platforms.map((p) => ({ ...p })),
     coins: coins.map((c) => ({ ...c })),
+    spaceHazards: spaceHazards.map((h) => ({ ...h })),
   };
 }
 
@@ -306,6 +468,7 @@ function restoreProgress() {
   player.onIce = savedProgress.player.onIce;
   platforms = savedProgress.platforms.map((p) => ({ ...p }));
   coins = (savedProgress.coins || []).map((c) => ({ ...c }));
+  spaceHazards = (savedProgress.spaceHazards || []).map((h) => ({ ...h }));
   gameState = 'playing';
   hud.classList.remove('hidden');
   showScreen('none');
@@ -330,6 +493,11 @@ function resetGame() {
   player.jumpCount = 0;
   cameraY = WORLD_HEIGHT - HEIGHT;
   confetti = [];
+  coinBursts = [];
+  spaceHazards = [];
+  damageCooldown = 0;
+  coyoteFrames = 0;
+  jumpBufferFrames = 0;
   createPlatforms();
   createStars();
   closeShop();
@@ -362,7 +530,7 @@ function createPlatforms() {
   coins = [];
   platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
   const rows = [];
-  for (let y = WORLD_HEIGHT - 180; y > GOAL_Y + 80; y -= 180) {
+  for (let y = WORLD_HEIGHT - 160; y > GOAL_Y + 80; y -= 160) {
     rows.push(y);
   }
   const columnCount = Math.max(5, Math.floor(WIDTH / 180));
@@ -372,7 +540,7 @@ function createPlatforms() {
   });
   rows.forEach((y, index) => {
     const x = column[index % column.length];
-    const width = Math.max(120, 260 - index * 10);
+    const width = Math.max(140, 280 - index * 7);
     const altitude = WORLD_HEIGHT - y;
     const biome = altitude < 3500 ? 'earth' : altitude < 7300 ? 'cloud' : 'space';
     const flowerDensity = Math.max(0, 1 - altitude / 4500);
@@ -395,6 +563,7 @@ function createPlatforms() {
       }
     }
   });
+  createSpaceHazards();
 }
 
 function createStars() {
@@ -801,7 +970,23 @@ function applyPhysics() {
   player.onIce = false;
   let standingPlatform = null;
 
-  player.vy += 0.9;
+  if (damageCooldown > 0) damageCooldown -= 1;
+  if (jumpBufferFrames > 0) jumpBufferFrames -= 1;
+
+  spaceHazards.forEach((hz) => {
+    hz.x += hz.vx;
+    if (hz.x < hz.minX || hz.x > hz.maxX) {
+      hz.vx *= -1;
+      hz.x = Math.max(hz.minX, Math.min(hz.maxX, hz.x));
+    }
+    const overlapX = Math.abs((player.x + player.width / 2) - hz.x) < (player.width / 2 + hz.w / 2 - 2);
+    const overlapY = Math.abs((player.y + player.height / 2) - hz.y) < (player.height / 2 + hz.h / 2 - 2);
+    if (overlapX && overlapY) {
+      hitPlayer();
+    }
+  });
+
+  player.vy += 0.72;
   const oldY = player.y;
   const newY = player.y + player.vy;
   const oldBottom = oldY + player.height;
@@ -859,6 +1044,9 @@ function applyPhysics() {
     dropStartY = oldY;
   }
 
+  if (player.onGround) coyoteFrames = 7;
+  else if (coyoteFrames > 0) coyoteFrames -= 1;
+
   if (!player.onGround) {
     player.y = newY;
   }
@@ -911,6 +1099,8 @@ function applyPhysics() {
     if (overlapX && overlapY) {
       coin.collected = true;
       coinBalance += 1;
+      spawnCoinBurst(coin.x, coin.y);
+      playCoinSfx();
       updateCoinsHUD();
     }
   });
@@ -930,17 +1120,21 @@ function applyPhysics() {
   }
 
   const scale = Math.max(1.0, HEIGHT / 900);
-  const groundJump = -19.5 * scale;
-  const airJump = -17.5 * scale;
-  if (player.onGround && keys.jump) {
+  const groundJump = -20.8 * scale;
+  const airJump = -18.8 * scale;
+  if (keys.jump) jumpBufferFrames = 7;
+  if ((player.onGround || coyoteFrames > 0) && jumpBufferFrames > 0) {
     player.vy = groundJump;
     player.jumpCount = 1;
+    coyoteFrames = 0;
+    jumpBufferFrames = 0;
     keys.jump = false;
   }
 
-  if (!player.onGround && keys.jump && player.jumpCount < 2) {
+  if (!player.onGround && jumpBufferFrames > 0 && player.jumpCount < 2) {
     player.vy = airJump;
     player.jumpCount += 1;
+    jumpBufferFrames = 0;
     keys.jump = false;
   }
 
@@ -1026,7 +1220,9 @@ function draw() {
   drawBackground();
   drawPlants();
   drawPlatforms();
+  drawSpaceHazards();
   drawCoins();
+  drawCoinBursts();
   drawGoal();
   drawCat();
   if (gameState === 'win') handleConfetti();

@@ -428,3 +428,88 @@ button:hover {
   font-size: clamp(14px, 1.8vw, 16px);
   margin-bottom: 8px;
 }
+
+.hat-preview {
+  position: relative;
+  width: 78px;
+  height: 54px;
+  margin: 0 auto 8px;
+}
+
+.hat-preview-base {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 24px;
+  background: #111;
+  border: 2px solid #000;
+}
+
+.hat-preview-none {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.hat-preview-piece {
+  position: absolute;
+  image-rendering: pixelated;
+}
+
+.hat-preview-cap-main {
+  left: 23px;
+  top: 10px;
+  width: 30px;
+  height: 10px;
+  background: #df5252;
+}
+
+.hat-preview-cap-brim {
+  left: 38px;
+  top: 18px;
+  width: 16px;
+  height: 4px;
+  background: #b33f3f;
+}
+
+.hat-preview-crown-band {
+  left: 23px;
+  top: 13px;
+  width: 30px;
+  height: 9px;
+  background: #f4ce46;
+}
+
+.hat-preview-crown-tip {
+  width: 6px;
+  height: 8px;
+  background: #f6dd6e;
+  top: 6px;
+}
+
+.hat-preview-crown-tip.left { left: 23px; }
+.hat-preview-crown-tip.mid { left: 35px; height: 10px; top: 4px; }
+.hat-preview-crown-tip.right { left: 47px; }
+
+.hat-preview-wizard-cone {
+  left: 24px;
+  top: 4px;
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 22px solid #7f79df;
+}
+
+.hat-preview-wizard-brim {
+  left: 20px;
+  top: 24px;
+  width: 36px;
+  height: 4px;
+  background: #6a65c0;
+}
