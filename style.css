@@ -6,6 +6,9 @@
   --panel: rgba(10, 18, 38, 0.92);
   --button: #52538f;
   --button-hover: #52538f;
+  --ui-title-size: clamp(40px, 6vw, 64px);
+  --ui-subtitle-size: clamp(20px, 3.2vw, 30px);
+  --ui-body-size: clamp(16px, 2.2vw, 20px);
 }
 
 @font-face {
@@ -114,17 +117,14 @@ canvas {
   text-align: center;
 }
 
-.screen-panel h1 {
-  font-size: clamp(36px, 7vw, 84px);
+.screen-panel h1,
+.screen-panel h2 {
+  font-size: var(--ui-title-size);
   line-height: 1.02;
 }
 
-.screen-panel h2 {
-  font-size: clamp(28px, 4.5vw, 54px);
-}
-
 .screen-panel p {
-  font-size: clamp(16px, 2.6vw, 20px);
+  font-size: var(--ui-subtitle-size);
 }
 
 h1, h2 {
@@ -145,6 +145,15 @@ p, li, button, .hud, #hud div, .button-row, .screen-panel, ul {
 p, li {
   line-height: 1.6;
   margin-bottom: 6px;
+}
+
+li,
+#hud,
+#hud div,
+button,
+.hud-button,
+.lives-count {
+  font-size: var(--ui-body-size);
 }
 
 ul {
@@ -180,7 +189,6 @@ button {
 
 button {
   font-weight: 700;
-  font-size: clamp(14px, 2.2vw, 18px);
   padding: 16px 30px;
 }
 
@@ -197,7 +205,6 @@ button:hover {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  font-size: 1rem;
   letter-spacing: 0.04em;
   z-index: 5;
   pointer-events: none;
@@ -234,7 +241,6 @@ button:hover {
   color: #fff;
   padding: 12px 20px;
   border-radius: 2px;
-  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.16s ease, background 0.16s ease;
