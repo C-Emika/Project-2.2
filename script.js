@@ -476,13 +476,15 @@ function restoreProgress() {
   return true;
 }
 
-function resetGame() {
+function resetGame(keepProgress = false) {
   gameState = 'playing';
   lives = 9;
-  coinBalance = 0;
-  selectedHat = 'none';
-  unlockedHats.clear();
-  unlockedHats.add('none');
+  if (!keepProgress) {
+    coinBalance = 0;
+    selectedHat = 'none';
+    unlockedHats.clear();
+    unlockedHats.add('none');
+  }
   savedProgress = null;
   player.x = WIDTH / 2 - 24;
   player.y = WORLD_HEIGHT - 32 - player.height;
@@ -653,8 +655,13 @@ function startGame() {
   if (gameState === 'title' && restoreProgress()) {
     return;
   }
-  if (gameState === 'title' || gameState === 'win') {
+  if (gameState === 'title') {
     resetGame();
+    showScreen('none');
+  }
+  if (gameState === 'win') {
+    // keep coin/shop progress when replaying from the win flow
+    resetGame(true);
     showScreen('none');
   }
 }
@@ -1266,7 +1273,8 @@ if (backBtn) {
 if (playAgainBtn) {
   playAgainBtn.addEventListener('click', () => {
     showScreen('none');
-    resetGame();
+    // win-screen replay keeps collected coins and purchased hats
+    resetGame(true);
   });
 }
 
