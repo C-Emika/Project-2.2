@@ -24,6 +24,7 @@ const keys = {
   left: false,
   right: false,
   up: false,
+  down: false,
   jump: false,
 };
 
@@ -62,10 +63,91 @@ let walkFrame = 0;
 let walkTimer = 0;
 let lastMoveTime = Date.now();
 let isSitting = false;
+let savedProgress = null;
+const spriteFrameCache = new WeakMap();
+
+function getSpriteFrame(img) {
+  if (!img) return null;
+  if (spriteFrameCache.has(img)) return spriteFrameCache.get(img);
+
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = w;
+  tmpCanvas.height = h;
+  const tmpCtx = tmpCanvas.getContext('2d');
+  tmpCtx.drawImage(img, 0, 0);
+  const pixels = tmpCtx.getImageData(0, 0, w, h).data;
+
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const alpha = pixels[(y * w + x) * 4 + 3];
+      if (alpha > 0) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  const frame = maxX >= 0
+    ? { sx: minX, sy: minY, sw: maxX - minX + 1, sh: maxY - minY + 1 }
+    : { sx: 0, sy: 0, sw: w, sh: h };
+
+  spriteFrameCache.set(img, frame);
+  return frame;
+}
+
+function saveProgress() {
+  savedProgress = {
+    lives,
+    cameraY,
+    dropStartY,
+    player: {
+      x: player.x,
+      y: player.y,
+      vx: player.vx,
+      vy: player.vy,
+      jumpCount: player.jumpCount,
+      facingRight: player.facingRight,
+      onGround: player.onGround,
+      onIce: player.onIce,
+    },
+    platforms: platforms.map((p) => ({ ...p })),
+  };
+}
+
+function restoreProgress() {
+  if (!savedProgress) return false;
+  lives = savedProgress.lives;
+  cameraY = savedProgress.cameraY;
+  dropStartY = savedProgress.dropStartY;
+  player.x = savedProgress.player.x;
+  player.y = savedProgress.player.y;
+  player.vx = savedProgress.player.vx;
+  player.vy = savedProgress.player.vy;
+  player.jumpCount = savedProgress.player.jumpCount;
+  player.facingRight = savedProgress.player.facingRight;
+  player.onGround = savedProgress.player.onGround;
+  player.onIce = savedProgress.player.onIce;
+  platforms = savedProgress.platforms.map((p) => ({ ...p }));
+  gameState = 'playing';
+  hud.classList.remove('hidden');
+  showScreen('none');
+  updateHUD();
+  return true;
+}
 
 function resetGame() {
   gameState = 'playing';
   lives = 9;
+  savedProgress = null;
   player.x = WIDTH / 2 - 24;
   player.y = WORLD_HEIGHT - 32 - player.height;
   player.vx = 0;
@@ -124,7 +206,12 @@ function createPlatforms() {
 function createStars() {
   stars = [];
   for (let i = 0; i < 120; i += 1) {
-    stars.push({ x: Math.random() * WIDTH, y: Math.random() * (HEIGHT - 140), radius: Math.random() * 1.5 + 0.7, alpha: Math.random() * 0.65 + 0.35 });
+    stars.push({
+      x: Math.random() * WIDTH,
+      y: Math.random() * WORLD_HEIGHT,
+      radius: Math.random() * 1.5 + 0.7,
+      alpha: Math.random() * 0.65 + 0.35,
+    });
   }
 }
 
@@ -198,6 +285,9 @@ function showScreen(screen) {
 }
 
 function startGame() {
+  if (gameState === 'title' && restoreProgress()) {
+    return;
+  }
   if (gameState === 'title' || gameState === 'win') {
     resetGame();
     showScreen('none');
@@ -246,25 +336,27 @@ function handleConfetti() {
 }
 
 function drawBackground() {
-  const progress = 1 - Math.min(Math.max((cameraY / (WORLD_HEIGHT - HEIGHT)) * 1.2, 0), 1);
-  const skyTop = mixColor('#0b2143', '#52538f', progress * 0.65 + 0.1);
-  const skyBottom = mixColor('#99bce8', '#779bc8', progress * 0.35 + 0.25);
-  const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-  gradient.addColorStop(0, skyTop);
-  gradient.addColorStop(1, skyBottom);
+  // World-fixed sky gradient: dark at top of world, light at ground.
+  const worldTop = -cameraY;
+  const worldBottom = WORLD_HEIGHT - cameraY;
+  const gradient = ctx.createLinearGradient(0, worldTop, 0, worldBottom);
+  gradient.addColorStop(0, '#0b2143');
+  gradient.addColorStop(0.35, '#2b446f');
+  gradient.addColorStop(1, '#99bce8');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.save();
-  ctx.translate(0, -cameraY * 0.14);
-  const starAlpha = Math.max(0, progress - 0.2) * 1.3;
+
+  const heightProgress = 1 - Math.min(Math.max(cameraY / (WORLD_HEIGHT - HEIGHT), 0), 1);
+  const starAlpha = Math.max(0, heightProgress - 0.2) * 1.15;
   ctx.globalAlpha = starAlpha;
   stars.forEach((star) => {
+    const sy = star.y - cameraY;
+    if (sy < -10 || sy > HEIGHT + 10) return;
     ctx.fillStyle = `rgba(255,255,255,${star.alpha})`;
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+    ctx.arc(star.x, sy, star.radius, 0, Math.PI * 2);
     ctx.fill();
   });
-  ctx.restore();
   ctx.globalAlpha = 1;
 }
 
@@ -377,8 +469,6 @@ function drawCat() {
   const py = Math.round(player.y - cameraY);
   const desiredW = Math.round(player.width * 1.45);
   const desiredH = Math.round(player.height * 1.45);
-  // compute draw position so the sprite bottom aligns with player's bottom
-  const bottomOnScreen = py + player.height;
   const now = Date.now();
   const moving = keys.left || keys.right;
   if (moving) {
@@ -386,9 +476,10 @@ function drawCat() {
     player.facingRight = keys.right || !keys.left;
   }
 
-  // Sitting: only set when on ground and idle for >2s
-  const wasSitting = isSitting;
-  isSitting = !moving && (now - lastMoveTime > 2000) && player.onGround;
+  // Sitting: manual crouch with Down/S, or automatic idle sit.
+  const autoSit = !moving && (now - lastMoveTime > 2000) && player.onGround;
+  const manualSit = keys.down && player.onGround;
+  isSitting = manualSit || autoSit;
 
   let sprite = null;
   if (isSitting && assets.catSit) sprite = assets.catSit;
@@ -404,20 +495,19 @@ function drawCat() {
   if (sprite) {
     // scale the image using its natural size so any internal trimming in the
     // PNG isn't accidentally clipped by incorrect draw offsets
-    const imgW = sprite.width || sprite.naturalWidth;
-    const imgH = sprite.height || sprite.naturalHeight;
-    const scale = Math.min(desiredW / imgW, desiredH / imgH);
-    const drawW = Math.round(imgW * scale);
-    const drawH = Math.round(imgH * scale);
+    const frame = getSpriteFrame(sprite);
+    const scale = Math.min(desiredW / frame.sw, desiredH / frame.sh);
+    const drawW = Math.round(frame.sw * scale);
+    const drawH = Math.round(frame.sh * scale);
     const drawX = Math.round(player.x + (player.width - drawW) / 2);
     const drawY = Math.round((player.y + player.height) - drawH - cameraY);
     ctx.save();
     if (!player.facingRight) {
       ctx.translate(drawX + drawW, drawY);
       ctx.scale(-1, 1);
-      ctx.drawImage(sprite, 0, 0, imgW, imgH, 0, 0, drawW, drawH);
+      ctx.drawImage(sprite, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, drawW, drawH);
     } else {
-      ctx.drawImage(sprite, 0, 0, imgW, imgH, drawX, drawY, drawW, drawH);
+      ctx.drawImage(sprite, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
     }
     ctx.restore();
     return;
@@ -426,6 +516,8 @@ function drawCat() {
   // fallback vector cat if sprites aren't available
   const fx = px;
   const fy = py;
+  const w = desiredW;
+  const h = desiredH;
   ctx.save();
   ctx.translate(fx + w / 2, fy + h / 2);
   ctx.fillStyle = '#f7c24b';
@@ -667,6 +759,14 @@ function handleInput(event, isDown) {
     if (!isDown) keys.jump = false;
     event.preventDefault();
   }
+
+  if (event.code === 'ArrowDown' || event.code === 'KeyS') {
+    keys.down = isDown;
+    if (isDown && player.onGround) {
+      isSitting = true;
+    }
+    event.preventDefault();
+  }
 }
 
 function draw() {
@@ -723,12 +823,24 @@ if (playAgainBtn) {
 
 if (resetBtn) {
   resetBtn.addEventListener('click', () => {
+    const shouldReset = window.confirm(
+      'Reset will fully restart the game, clear saved progress, and return to the title screen. Continue?'
+    );
+    if (!shouldReset) return;
     resetGame();
+    gameState = 'title';
+    showScreen('title');
+    hud.classList.add('hidden');
   });
 }
 
 if (quitBtn) {
   quitBtn.addEventListener('click', () => {
+    const shouldQuit = window.confirm(
+      'Quit will save your current progress and return to the title screen. Continue?'
+    );
+    if (!shouldQuit) return;
+    saveProgress();
     gameState = 'title';
     showScreen('title');
     hud.classList.add('hidden');
@@ -761,6 +873,7 @@ window.addEventListener('blur', () => {
   keys.left = false;
   keys.right = false;
   keys.up = false;
+  keys.down = false;
   keys.jump = false;
 });
 
