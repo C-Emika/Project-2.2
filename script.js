@@ -396,13 +396,22 @@ function drawCat() {
   } else if (assets.catStand) sprite = assets.catStand;
 
   if (sprite) {
+    // Draw sprite using its natural size and scale to target height so frames
+    // with trimmed padding don't appear cropped. Align sprite bottom to player bottom.
+    const srcW = sprite.width || w;
+    const srcH = sprite.height || h;
+    const scale = h / srcH;
+    const dw = Math.round(srcW * scale);
+    const dh = Math.round(srcH * scale);
+    const dx = Math.round(player.x + player.width / 2 - dw / 2);
+    const dy = Math.round(player.y - cameraY - dh + player.height);
     ctx.save();
     if (!player.facingRight) {
-      ctx.translate(drawX + w, drawY);
+      ctx.translate(dx + dw, dy);
       ctx.scale(-1, 1);
-      ctx.drawImage(sprite, 0, 0, w, h);
+      ctx.drawImage(sprite, 0, 0, srcW, srcH, 0, 0, dw, dh);
     } else {
-      ctx.drawImage(sprite, drawX, drawY, w, h);
+      ctx.drawImage(sprite, 0, 0, srcW, srcH, dx, dy, dw, dh);
     }
     ctx.restore();
     return;
@@ -643,7 +652,7 @@ function handleInput(event, isDown) {
 }
 
 function draw() {
-  if (gameState === 'title') return;
+  // Always draw the background and HUD layers so overlays sit on top.
   drawBackground();
   drawPlants();
   drawPlatforms();
@@ -662,12 +671,10 @@ function update() {
 }
 
 function loop() {
-  if (gameState !== 'title') {
-    update();
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    draw();
-  }
-  if (gameState === 'win') handleConfetti();
+  // Clear and always render frame; only update physics when playing.
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  if (gameState === 'playing') update();
+  draw();
   requestAnimationFrame(loop);
 }
 
