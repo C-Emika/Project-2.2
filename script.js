@@ -14,6 +14,11 @@ const resetBtn = document.getElementById('resetBtn');
 const quitBtn = document.getElementById('quitBtn');
 const deathPlayAgainBtn = document.getElementById('deathPlayAgainBtn');
 const deathQuitBtn = document.getElementById('deathQuitBtn');
+const warningOverlay = document.getElementById('warningOverlay');
+const warningTitle = document.getElementById('warningTitle');
+const warningMessage = document.getElementById('warningMessage');
+const warningConfirmBtn = document.getElementById('warningConfirmBtn');
+const warningCancelBtn = document.getElementById('warningCancelBtn');
 
 let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
@@ -65,6 +70,29 @@ let lastMoveTime = Date.now();
 let isSitting = false;
 let savedProgress = null;
 const spriteFrameCache = new WeakMap();
+let warningAction = null;
+
+function applyPixelRenderSettings() {
+  ctx.imageSmoothingEnabled = false;
+}
+
+function showWarningModal(title, message, onConfirm) {
+  warningAction = onConfirm;
+  if (warningTitle) warningTitle.textContent = title;
+  if (warningMessage) warningMessage.textContent = message;
+  if (warningOverlay) {
+    warningOverlay.classList.remove('hidden');
+    warningOverlay.classList.add('active');
+  }
+}
+
+function hideWarningModal() {
+  warningAction = null;
+  if (warningOverlay) {
+    warningOverlay.classList.add('hidden');
+    warningOverlay.classList.remove('active');
+  }
+}
 
 function getSpriteFrame(img) {
   if (!img) return null;
@@ -174,6 +202,7 @@ function resizeCanvas() {
   const relX = oldW > 0 ? player.x / oldW : 0.5;
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  applyPixelRenderSettings();
   WIDTH = canvas.width;
   HEIGHT = canvas.height;
   player.x = Math.max(0, Math.min(relX * WIDTH, WIDTH - player.width));
@@ -825,27 +854,31 @@ if (playAgainBtn) {
 
 if (resetBtn) {
   resetBtn.addEventListener('click', () => {
-    const shouldReset = window.confirm(
-      'Reset will fully restart the game, clear saved progress, and return to the title screen. Continue?'
+    showWarningModal(
+      'Reset Progress?',
+      'Reset fully restarts the game, clears saved progress, and returns to the title screen.',
+      () => {
+        resetGame();
+        gameState = 'title';
+        showScreen('title');
+        hud.classList.add('hidden');
+      }
     );
-    if (!shouldReset) return;
-    resetGame();
-    gameState = 'title';
-    showScreen('title');
-    hud.classList.add('hidden');
   });
 }
 
 if (quitBtn) {
   quitBtn.addEventListener('click', () => {
-    const shouldQuit = window.confirm(
-      'Quit will save your current progress and return to the title screen. Continue?'
+    showWarningModal(
+      'Quit to Title?',
+      'Quit saves current progress and exits to the title screen.',
+      () => {
+        saveProgress();
+        gameState = 'title';
+        showScreen('title');
+        hud.classList.add('hidden');
+      }
     );
-    if (!shouldQuit) return;
-    saveProgress();
-    gameState = 'title';
-    showScreen('title');
-    hud.classList.add('hidden');
   });
 }
 
@@ -865,6 +898,11 @@ if (deathQuitBtn) {
 }
 
 window.addEventListener('keydown', (event) => {
+  if (warningOverlay && !warningOverlay.classList.contains('hidden')) {
+    if (event.code === 'Escape') hideWarningModal();
+    event.preventDefault();
+    return;
+  }
   handleInput(event, true);
 });
 window.addEventListener('keyup', (event) => {
@@ -883,6 +921,21 @@ showScreen('title');
 // initialize canvas size and content
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+applyPixelRenderSettings();
+
+if (warningConfirmBtn) {
+  warningConfirmBtn.addEventListener('click', () => {
+    const action = warningAction;
+    hideWarningModal();
+    if (action) action();
+  });
+}
+
+if (warningCancelBtn) {
+  warningCancelBtn.addEventListener('click', () => {
+    hideWarningModal();
+  });
+}
 // load optional assets then start
 loadAssets().finally(() => {
   drawLives();
