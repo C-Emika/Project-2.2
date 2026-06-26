@@ -600,11 +600,6 @@ function applyPhysics() {
     keys.jump = false;
   }
 
-  // If jump is initiated while sitting, transition to standing before applying jump
-  if (wasSitting && keys.jump) {
-    isSitting = false;
-  }
-
   if (player.y > WORLD_HEIGHT + 120) {
     lives -= 1;
     if (lives <= 0) {
@@ -654,11 +649,23 @@ function drawGoal() {
 }
 
 function handleInput(event, isDown) {
-  if (event.code === 'ArrowLeft' || event.code === 'KeyA') keys.left = isDown;
-  if (event.code === 'ArrowRight' || event.code === 'KeyD') keys.right = isDown;
+  if (event.code === 'ArrowLeft' || event.code === 'KeyA') {
+    keys.left = isDown;
+    event.preventDefault();
+  }
+  if (event.code === 'ArrowRight' || event.code === 'KeyD') {
+    keys.right = isDown;
+    event.preventDefault();
+  }
   if (event.code === 'ArrowUp' || event.code === 'KeyW' || event.code === 'Space') {
+    if (isDown) {
+      // jumping from sit should immediately switch out of sit pose
+      isSitting = false;
+      lastMoveTime = Date.now();
+    }
     if (isDown) keys.jump = true;
     if (!isDown) keys.jump = false;
+    event.preventDefault();
   }
 }
 
@@ -748,6 +755,13 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => {
   handleInput(event, false);
+});
+
+window.addEventListener('blur', () => {
+  keys.left = false;
+  keys.right = false;
+  keys.up = false;
+  keys.jump = false;
 });
 
 showScreen('title');
