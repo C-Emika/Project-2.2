@@ -4,8 +4,8 @@
   --bg-dark: #0b1444;
   --text: #fff;
   --panel: rgba(10, 18, 38, 0.92);
-  --button: #ffb347;
-  --button-hover: #ffc966;
+  --button: #52538f;
+  --button-hover: #52538f;
 }
 
 @font-face {
@@ -161,7 +161,7 @@ button + button {
 }
 
 button {
-  background: #7fc7ff;
+  background: #52538f;
   border: none;
   color: #041b35;
   padding: 14px 28px;
@@ -179,7 +179,7 @@ button {
 }
 
 button:hover {
-  background: #a5dbff;
+  background: #52538f;
   transform: translateY(-2px);
 }
 
@@ -223,7 +223,7 @@ button:hover {
 }
 
 .hud-button {
-  background: #7fc7ff;
+  background: #52538f;
   border: none;
   color: #041b35;
   padding: 12px 20px;
@@ -236,7 +236,7 @@ button:hover {
 }
 
 .hud-button:hover {
-  background: #a5dbff;
+  background: #52538f;
   transform: translateY(-2px);
 }
 

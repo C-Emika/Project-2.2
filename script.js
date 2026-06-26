@@ -645,7 +645,7 @@ function clamp(value, min, max) {
 function drawGoal() {
   const topBar = GOAL_Y - cameraY;
   // use the same light blue as buttons for the space gate line
-  ctx.fillStyle = '#7fc7ff';
+  ctx.fillStyle = '#52538f';
   ctx.fillRect(0, topBar, WIDTH, 10);
   ctx.fillStyle = '#fff';
   ctx.font = '700 24px "Vibe Coding Body", "Vibe Coding Title", sans-serif';
