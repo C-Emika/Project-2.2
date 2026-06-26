@@ -255,6 +255,23 @@ button:hover {
   vertical-align: middle;
 }
 
+#lives {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lives-count {
+  min-width: 2ch;
+}
+
+.lives-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  margin-right: 0;
+}
+
 #lives img.empty {
   opacity: 0.4;
   filter: grayscale(1);
@@ -318,6 +335,33 @@ button:hover {
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
   touch-action: none;
   user-select: none;
+}
+
+.mobile-control-btn::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+.mobile-left::before {
+  border-width: 12px 16px 12px 0;
+  border-color: transparent #ffffff transparent transparent;
+}
+
+.mobile-right::before {
+  border-width: 12px 0 12px 16px;
+  border-color: transparent transparent transparent #ffffff;
+}
+
+.mobile-up::before {
+  border-width: 0 12px 16px 12px;
+  border-color: transparent transparent #ffffff transparent;
+}
+
+.mobile-down::before {
+  border-width: 16px 12px 0 12px;
+  border-color: #ffffff transparent transparent transparent;
 }
 
 @media (hover: none), (pointer: coarse) {

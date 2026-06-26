@@ -117,15 +117,16 @@ function bindMobileControl(buttonEl, onDown, onUp) {
     onUp();
   };
 
-  buttonEl.addEventListener('pointerdown', press);
-  buttonEl.addEventListener('pointerup', release);
-  buttonEl.addEventListener('pointercancel', release);
-  buttonEl.addEventListener('pointerleave', release);
-
-  // fallback for environments without pointer events
-  buttonEl.addEventListener('touchstart', press, { passive: false });
-  buttonEl.addEventListener('touchend', release, { passive: false });
-  buttonEl.addEventListener('touchcancel', release, { passive: false });
+  if (window.PointerEvent) {
+    buttonEl.addEventListener('pointerdown', press);
+    buttonEl.addEventListener('pointerup', release);
+    buttonEl.addEventListener('pointercancel', release);
+    buttonEl.addEventListener('pointerleave', release);
+  } else {
+    buttonEl.addEventListener('touchstart', press, { passive: false });
+    buttonEl.addEventListener('touchend', release, { passive: false });
+    buttonEl.addEventListener('touchcancel', release, { passive: false });
+  }
 }
 
 function getSpriteFrame(img) {
@@ -299,20 +300,21 @@ function drawLives() {
   const livesEl = document.getElementById('lives');
   if (!livesEl) return;
   livesEl.innerHTML = '';
-  const total = 9;
-  for (let i = 0; i < total; i += 1) {
-    if (assets.heart) {
-      const img = document.createElement('img');
-      img.src = 'assets/heart.png';
-      img.alt = '♥';
-      if (i >= lives) img.classList.add('empty');
-      livesEl.appendChild(img);
-    } else {
-      const span = document.createElement('span');
-      span.textContent = '♥';
-      if (i >= lives) span.style.opacity = '0.4';
-      livesEl.appendChild(span);
-    }
+  const count = document.createElement('span');
+  count.className = 'lives-count';
+  count.textContent = `${lives}x`;
+  livesEl.appendChild(count);
+
+  if (assets.heart) {
+    const img = document.createElement('img');
+    img.src = 'assets/heart.png';
+    img.alt = 'heart';
+    img.className = 'lives-icon';
+    livesEl.appendChild(img);
+  } else {
+    const span = document.createElement('span');
+    span.textContent = '♥';
+    livesEl.appendChild(span);
   }
 }
 
