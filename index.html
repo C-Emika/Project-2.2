@@ -54,12 +54,23 @@
   <div id="hud" class="hud hidden">
     <div id="hudLeft">
       <div id="lives">Lives: 9</div>
+      <div id="coins">Coins: 0</div>
       <div id="height">Height: 0m</div>
       <div id="goal">Goal: Space</div>
     </div>
     <div id="hudRight">
+      <button id="shopBtn" class="hud-button">Shop</button>
       <button id="resetBtn" class="hud-button">Reset</button>
       <button id="quitBtn" class="hud-button">Quit</button>
+    </div>
+  </div>
+
+  <div id="shopOverlay" class="overlay hidden">
+    <div class="shop-panel">
+      <h2>Hat Shop</h2>
+      <p id="shopCoins">Coins: 0</p>
+      <div id="shopItems" class="shop-items"></div>
+      <button id="shopCloseBtn">Close</button>
     </div>
   </div>
 

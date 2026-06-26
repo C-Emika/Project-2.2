@@ -6,6 +6,7 @@ const winScreen = document.getElementById('winScreen');
 const deathScreen = document.getElementById('deathScreen');
 const hud = document.getElementById('hud');
 const livesText = document.getElementById('lives');
+const coinsText = document.getElementById('coins');
 const startBtn = document.getElementById('startBtn');
 const introBtn = document.getElementById('introBtn');
 const backBtn = document.getElementById('backBtn');
@@ -24,10 +25,15 @@ const mobileLeft = document.getElementById('mobileLeft');
 const mobileRight = document.getElementById('mobileRight');
 const mobileDown = document.getElementById('mobileDown');
 const mobileJump = document.getElementById('mobileJump');
+const shopBtn = document.getElementById('shopBtn');
+const shopOverlay = document.getElementById('shopOverlay');
+const shopCoins = document.getElementById('shopCoins');
+const shopItems = document.getElementById('shopItems');
+const shopCloseBtn = document.getElementById('shopCloseBtn');
 
 let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
-const WORLD_HEIGHT = 4200;
+const WORLD_HEIGHT = 10032;
 const GOAL_Y = 120;
 
 const keys = {
@@ -44,6 +50,8 @@ let lives = 9;
 let confetti = [];
 let platforms = [];
 let stars = [];
+let coins = [];
+let coinBalance = 0;
 let dropStartY = null;
 
 const player = {
@@ -76,6 +84,15 @@ let isSitting = false;
 let savedProgress = null;
 const spriteFrameCache = new WeakMap();
 let warningAction = null;
+let selectedHat = 'none';
+const unlockedHats = new Set(['none']);
+
+const hatCatalog = [
+  { id: 'none', label: 'No Hat', cost: 0, color: '#ffffff' },
+  { id: 'cap', label: 'Red Cap', cost: 12, color: '#df5252' },
+  { id: 'crown', label: 'Crown', cost: 25, color: '#f4ce46' },
+  { id: 'wizard', label: 'Wizard Hat', cost: 40, color: '#7f79df' },
+];
 
 function applyPixelRenderSettings() {
   ctx.imageSmoothingEnabled = false;
@@ -96,6 +113,86 @@ function hideWarningModal() {
   if (warningOverlay) {
     warningOverlay.classList.add('hidden');
     warningOverlay.classList.remove('active');
+  }
+}
+
+function updateCoinsHUD() {
+  if (coinsText) coinsText.textContent = `Coins: ${coinBalance}`;
+  if (shopCoins) shopCoins.textContent = `Coins: ${coinBalance}`;
+}
+
+function renderShop() {
+  if (!shopItems) return;
+  shopItems.innerHTML = '';
+  hatCatalog.forEach((hat) => {
+    const card = document.createElement('div');
+    card.className = 'shop-item';
+
+    const title = document.createElement('h3');
+    title.textContent = hat.label;
+    card.appendChild(title);
+
+    const price = document.createElement('p');
+    price.textContent = hat.cost === 0 ? 'Free' : `${hat.cost} coins`;
+    card.appendChild(price);
+
+    const btn = document.createElement('button');
+    const owned = unlockedHats.has(hat.id);
+    const selected = selectedHat === hat.id;
+    btn.textContent = selected ? 'Equipped' : owned ? 'Equip' : 'Buy';
+    btn.disabled = selected;
+    btn.addEventListener('click', () => {
+      const hasHat = unlockedHats.has(hat.id);
+      if (!hasHat && coinBalance < hat.cost) return;
+      if (!hasHat) {
+        coinBalance -= hat.cost;
+        unlockedHats.add(hat.id);
+      }
+      selectedHat = hat.id;
+      updateCoinsHUD();
+      renderShop();
+    });
+    card.appendChild(btn);
+
+    shopItems.appendChild(card);
+  });
+}
+
+function openShop() {
+  if (!shopOverlay) return;
+  renderShop();
+  updateCoinsHUD();
+  shopOverlay.classList.remove('hidden');
+  shopOverlay.classList.add('active');
+}
+
+function closeShop() {
+  if (!shopOverlay) return;
+  shopOverlay.classList.add('hidden');
+  shopOverlay.classList.remove('active');
+}
+
+function drawHatAt(x, y, w, h) {
+  if (selectedHat === 'none') return;
+  const hatY = y - Math.round(h * 0.16);
+  if (selectedHat === 'cap') {
+    ctx.fillStyle = '#df5252';
+    ctx.fillRect(x + Math.round(w * 0.22), hatY, Math.round(w * 0.56), Math.round(h * 0.16));
+    ctx.fillRect(x + Math.round(w * 0.56), hatY + Math.round(h * 0.13), Math.round(w * 0.22), Math.round(h * 0.05));
+  } else if (selectedHat === 'crown') {
+    ctx.fillStyle = '#f4ce46';
+    ctx.fillRect(x + Math.round(w * 0.22), hatY + Math.round(h * 0.08), Math.round(w * 0.56), Math.round(h * 0.12));
+    ctx.fillRect(x + Math.round(w * 0.22), hatY - Math.round(h * 0.03), Math.round(w * 0.1), Math.round(h * 0.08));
+    ctx.fillRect(x + Math.round(w * 0.46), hatY - Math.round(h * 0.06), Math.round(w * 0.1), Math.round(h * 0.11));
+    ctx.fillRect(x + Math.round(w * 0.68), hatY - Math.round(h * 0.03), Math.round(w * 0.1), Math.round(h * 0.08));
+  } else if (selectedHat === 'wizard') {
+    ctx.fillStyle = '#7f79df';
+    ctx.beginPath();
+    ctx.moveTo(x + Math.round(w * 0.18), hatY + Math.round(h * 0.18));
+    ctx.lineTo(x + Math.round(w * 0.5), hatY - Math.round(h * 0.18));
+    ctx.lineTo(x + Math.round(w * 0.82), hatY + Math.round(h * 0.18));
+    ctx.closePath();
+    ctx.fill();
   }
 }
 
@@ -170,6 +267,9 @@ function getSpriteFrame(img) {
 function saveProgress() {
   savedProgress = {
     lives,
+    coinBalance,
+    selectedHat,
+    unlockedHats: Array.from(unlockedHats),
     cameraY,
     dropStartY,
     player: {
@@ -183,12 +283,17 @@ function saveProgress() {
       onIce: player.onIce,
     },
     platforms: platforms.map((p) => ({ ...p })),
+    coins: coins.map((c) => ({ ...c })),
   };
 }
 
 function restoreProgress() {
   if (!savedProgress) return false;
   lives = savedProgress.lives;
+  coinBalance = savedProgress.coinBalance || 0;
+  selectedHat = savedProgress.selectedHat || 'none';
+  unlockedHats.clear();
+  (savedProgress.unlockedHats || ['none']).forEach((h) => unlockedHats.add(h));
   cameraY = savedProgress.cameraY;
   dropStartY = savedProgress.dropStartY;
   player.x = savedProgress.player.x;
@@ -200,6 +305,7 @@ function restoreProgress() {
   player.onGround = savedProgress.player.onGround;
   player.onIce = savedProgress.player.onIce;
   platforms = savedProgress.platforms.map((p) => ({ ...p }));
+  coins = (savedProgress.coins || []).map((c) => ({ ...c }));
   gameState = 'playing';
   hud.classList.remove('hidden');
   showScreen('none');
@@ -210,6 +316,10 @@ function restoreProgress() {
 function resetGame() {
   gameState = 'playing';
   lives = 9;
+  coinBalance = 0;
+  selectedHat = 'none';
+  unlockedHats.clear();
+  unlockedHats.add('none');
   savedProgress = null;
   player.x = WIDTH / 2 - 24;
   player.y = WORLD_HEIGHT - 32 - player.height;
@@ -222,6 +332,7 @@ function resetGame() {
   confetti = [];
   createPlatforms();
   createStars();
+  closeShop();
   hud.classList.remove('hidden');
   updateHUD();
   // force an immediate draw so sprites load and positioning updates
@@ -248,21 +359,40 @@ function resizeCanvas() {
 
 function createPlatforms() {
   platforms = [];
-  platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0 });
+  coins = [];
+  platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
   const rows = [];
   for (let y = WORLD_HEIGHT - 180; y > GOAL_Y + 80; y -= 180) {
     rows.push(y);
   }
-  const column = [40, 180, 330, 500, 660];
+  const columnCount = Math.max(5, Math.floor(WIDTH / 180));
+  const column = Array.from({ length: columnCount }, (_, i) => {
+    const t = columnCount === 1 ? 0 : i / (columnCount - 1);
+    return Math.round(40 + t * Math.max(0, WIDTH - 120));
+  });
   rows.forEach((y, index) => {
     const x = column[index % column.length];
     const width = Math.max(120, 260 - index * 10);
+    const altitude = WORLD_HEIGHT - y;
+    const biome = altitude < 3500 ? 'earth' : altitude < 7300 ? 'cloud' : 'space';
+    const flowerDensity = Math.max(0, 1 - altitude / 4500);
     const variant = index % 7 === 2 ? 'breakable' : index % 5 === 3 ? 'ice' : 'normal';
-    platforms.push({ x, y, width, height: 24, type: 'platform', variant, waitTime: 0 });
+    platforms.push({ x, y, width, height: 24, type: 'platform', variant, waitTime: 0, biome, flowerDensity });
+    if (Math.random() < 0.45) {
+      coins.push({ x: x + width / 2, y: y - 16, collected: false });
+    }
     if (index % 2 === 0) {
       const altWidth = Math.max(110, width * 0.7);
       const altVariant = (index + 3) % 8 === 0 ? 'ice' : 'normal';
-      platforms.push({ x: WIDTH - x - altWidth, y: y - 110, width: altWidth, height: 24, type: 'platform', variant: altVariant, waitTime: 0 });
+      const altX = WIDTH - x - altWidth;
+      const altY = y - 110;
+      const altAltitude = WORLD_HEIGHT - altY;
+      const altBiome = altAltitude < 3500 ? 'earth' : altAltitude < 7300 ? 'cloud' : 'space';
+      const altFlowerDensity = Math.max(0, 1 - altAltitude / 4500);
+      platforms.push({ x: altX, y: altY, width: altWidth, height: 24, type: 'platform', variant: altVariant, waitTime: 0, biome: altBiome, flowerDensity: altFlowerDensity });
+      if (Math.random() < 0.35) {
+        coins.push({ x: altX + altWidth / 2, y: altY - 16, collected: false });
+      }
     }
   });
 }
@@ -320,6 +450,7 @@ function drawLives() {
 
 function updateHUD() {
   drawLives();
+  updateCoinsHUD();
   // ground should read as 0 meters (ground platform is 32px high)
   const heightMeters = Math.max(0, Math.round((WORLD_HEIGHT - player.y - player.height - 32) / 10));
   document.getElementById('height').textContent = `Height: ${heightMeters}m`;
@@ -483,14 +614,37 @@ function drawPlatforms() {
     const screenY = plat.y - cameraY;
     if (plat.type === 'ground') {
       ctx.fillStyle = '#2f4e38';
-    } else if (plat.variant === 'ice') {
-      ctx.fillStyle = '#c7ecff';
-    } else if (plat.variant === 'breakable') {
-      ctx.fillStyle = '#f7b76c';
     } else {
-      ctx.fillStyle = '#ffffffcc';
+      if (plat.biome === 'earth') {
+        ctx.fillStyle = '#6b4b2d';
+      } else if (plat.biome === 'cloud') {
+        ctx.fillStyle = '#e7f4ff';
+      } else {
+        ctx.fillStyle = '#83889a';
+      }
     }
     ctx.fillRect(plat.x, screenY, plat.width, plat.height);
+
+    if (plat.biome === 'earth') {
+      ctx.fillStyle = '#3f8c47';
+      ctx.fillRect(plat.x, screenY, plat.width, Math.max(4, plat.height * 0.3));
+      const flowers = Math.floor((plat.width / 36) * (plat.flowerDensity || 0));
+      for (let i = 0; i < flowers; i += 1) {
+        const fx = plat.x + 12 + i * 20;
+        const fy = screenY + 4;
+        ctx.fillStyle = '#f4d35e';
+        ctx.fillRect(fx, fy, 2, 2);
+        ctx.fillStyle = '#f26f8b';
+        ctx.fillRect(fx - 2, fy + 2, 2, 2);
+        ctx.fillRect(fx + 2, fy + 2, 2, 2);
+      }
+    }
+
+    if (plat.biome === 'space') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(plat.x + 1, screenY + 1, plat.width - 2, plat.height - 2);
+    }
 
     if (plat.type === 'platform') {
       ctx.strokeStyle = plat.variant === 'ice' ? 'rgba(50, 130, 190, 0.55)' : 'rgba(0,0,0,0.15)';
@@ -526,6 +680,18 @@ function drawPlatforms() {
         }
       }
     }
+  });
+}
+
+function drawCoins() {
+  coins.forEach((coin) => {
+    if (coin.collected) return;
+    const cy = coin.y - cameraY;
+    if (cy < -30 || cy > HEIGHT + 30) return;
+    ctx.fillStyle = '#ffd84d';
+    ctx.fillRect(Math.round(coin.x - 6), Math.round(cy - 6), 12, 12);
+    ctx.fillStyle = '#ffef9a';
+    ctx.fillRect(Math.round(coin.x - 2), Math.round(cy - 2), 4, 4);
   });
 }
 
@@ -575,6 +741,7 @@ function drawCat() {
       ctx.drawImage(sprite, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
     }
     ctx.restore();
+    drawHatAt(drawX, drawY, drawW, drawH);
     return;
   }
 
@@ -625,6 +792,7 @@ function drawCat() {
   ctx.fillRect(-24, 10, 14, 14);
   ctx.fillRect(10, 10, 14, 14);
   ctx.restore();
+  drawHatAt(fx, fy, w, h);
 }
 
 function applyPhysics() {
@@ -710,23 +878,40 @@ function applyPhysics() {
     player.vx *= 0.98;
   }
 
-  const oldX = player.x;
-  player.x += player.vx;
+  const moveX = player.vx;
+  const stepCount = Math.max(1, Math.ceil(Math.abs(moveX) / 4));
+  const stepX = moveX / stepCount;
+  for (let s = 0; s < stepCount; s += 1) {
+    const oldX = player.x;
+    player.x += stepX;
+    let hitSide = false;
+    platforms.forEach((plat) => {
+      if (hitSide) return;
+      const platTop = plat.y;
+      const platBottom = plat.y + plat.height;
+      const verticalOverlap = player.y + player.height > platTop && player.y < platBottom;
+      if (!verticalOverlap) return;
+      if (oldX + player.width <= plat.x && player.x + player.width > plat.x) {
+        player.x = plat.x - player.width;
+        player.vx = 0;
+        hitSide = true;
+      } else if (oldX >= plat.x + plat.width && player.x < plat.x + plat.width) {
+        player.x = plat.x + plat.width;
+        player.vx = 0;
+        hitSide = true;
+      }
+    });
+    if (hitSide) break;
+  }
 
-  // horizontal collision resolution to prevent phasing through platforms
-  platforms.forEach((plat) => {
-    const platTop = plat.y;
-    const platBottom = plat.y + plat.height;
-    const verticalOverlap = player.y + player.height > platTop && player.y < platBottom;
-    if (!verticalOverlap) return;
-    if (oldX + player.width <= plat.x && player.x + player.width > plat.x) {
-      // hit from left
-      player.x = plat.x - player.width;
-      player.vx = 0;
-    } else if (oldX >= plat.x + plat.width && player.x < plat.x + plat.width) {
-      // hit from right
-      player.x = plat.x + plat.width;
-      player.vx = 0;
+  coins.forEach((coin) => {
+    if (coin.collected) return;
+    const overlapX = Math.abs((player.x + player.width / 2) - coin.x) < (player.width / 2 + 7);
+    const overlapY = Math.abs((player.y + player.height / 2) - coin.y) < (player.height / 2 + 7);
+    if (overlapX && overlapY) {
+      coin.collected = true;
+      coinBalance += 1;
+      updateCoinsHUD();
     }
   });
 
@@ -841,6 +1026,7 @@ function draw() {
   drawBackground();
   drawPlants();
   drawPlatforms();
+  drawCoins();
   drawGoal();
   drawCat();
   if (gameState === 'win') handleConfetti();
@@ -918,6 +1104,18 @@ if (quitBtn) {
   });
 }
 
+if (shopBtn) {
+  shopBtn.addEventListener('click', () => {
+    openShop();
+  });
+}
+
+if (shopCloseBtn) {
+  shopCloseBtn.addEventListener('click', () => {
+    closeShop();
+  });
+}
+
 if (deathPlayAgainBtn) {
   deathPlayAgainBtn.addEventListener('click', () => {
     showScreen('none');
@@ -934,6 +1132,11 @@ if (deathQuitBtn) {
 }
 
 window.addEventListener('keydown', (event) => {
+  if (shopOverlay && !shopOverlay.classList.contains('hidden')) {
+    if (event.code === 'Escape') closeShop();
+    event.preventDefault();
+    return;
+  }
   if (warningOverlay && !warningOverlay.classList.contains('hidden')) {
     if (event.code === 'Escape') hideWarningModal();
     event.preventDefault();
