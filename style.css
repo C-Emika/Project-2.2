@@ -16,7 +16,7 @@
 
 html, body {
   height: 100%;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Vibe Coding Body', system-ui, sans-serif;
   background: radial-gradient(circle at top, #2a4f8a 0%, #071028 70%);
   color: var(--text);
   overflow: hidden;
@@ -45,20 +45,11 @@ canvas {
   z-index: 10;
 }
 
-#titleScreen {
-  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('assets/bg_title.png');
-  background-size: cover;
-  background-position: center;
-}
-
-#deathScreen {
-  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('assets/bg_title.png');
-  background-size: cover;
-  background-position: center;
-}
-
+#titleScreen,
+#introScreen,
+#deathScreen,
 #winScreen {
-  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('assets/bg_title.png');
+  background: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)), url('assets/bg_title.png');
   background-size: cover;
   background-position: center;
 }
@@ -76,18 +67,19 @@ canvas {
 }
 
 .panel {
-  width: min(540px, 90%);
-  background: var(--panel);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 24px;
-  padding: 32px;
+  width: min(760px, 90%);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   text-align: center;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
 }
 
 h1, h2 {
   margin-bottom: 16px;
   letter-spacing: 0.06em;
+  font-family: 'Vibe Coding Title', sans-serif;
 }
 
 p, li {
@@ -110,9 +102,9 @@ ul {
 }
 
 button {
-  background: var(--button);
+  background: #7fc7ff;
   border: none;
-  color: #1a1a1a;
+  color: #041b35;
   padding: 14px 28px;
   border-radius: 999px;
   font-size: 1rem;
@@ -121,7 +113,7 @@ button {
 }
 
 button:hover {
-  background: var(--button-hover);
+  background: #a5dbff;
   transform: translateY(-2px);
 }
 
@@ -152,16 +144,16 @@ button:hover {
 }
 
 #hud div {
-  background: rgba(10, 18, 38, 0.8);
+  background: rgba(10, 18, 38, 0.7);
   padding: 12px 16px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .hud-button {
-  background: var(--button);
+  background: #7fc7ff;
   border: none;
-  color: #1a1a1a;
+  color: #041b35;
   padding: 12px 20px;
   border-radius: 12px;
   font-size: 0.9rem;
@@ -172,7 +164,7 @@ button:hover {
 }
 
 .hud-button:hover {
-  background: var(--button-hover);
+  background: #a5dbff;
   transform: translateY(-2px);
 }
 

@@ -8,18 +8,15 @@
 </head>
 <body>
   <div id="titleScreen" class="overlay active">
-    <div class="panel">
       <h1>Cat Climb</h1>
       <p>Guide the cat safely through a dreamy sky climb.</p>
       <div class="button-row">
         <button id="startBtn">Start</button>
         <button id="introBtn">Intro</button>
       </div>
-    </div>
   </div>
 
   <div id="introScreen" class="overlay hidden">
-    <div class="panel">
       <h2>How to Play</h2>
       <ul>
         <li>Use <strong>Left / Right</strong> arrow keys or <strong>A / D</strong> to move.</li>
@@ -29,24 +26,19 @@
         <li>Reach the top to win and enjoy the confetti celebration.</li>
       </ul>
       <button id="backBtn">Back</button>
-    </div>
   </div>
 
   <div id="winScreen" class="overlay hidden">
-    <div class="panel">
       <h2>Victory!</h2>
       <p>The cat reached space. Congratulations!</p>
       <button id="playAgainBtn">Play Again</button>
-    </div>
   </div>
 
   <div id="deathScreen" class="overlay hidden">
-    <div class="panel">
       <h2>Game Over</h2>
       <p>The cat has fallen out of the sky.</p>
       <button id="deathPlayAgainBtn">Try Again</button>
       <button id="deathQuitBtn">Quit to Title</button>
-    </div>
   </div>
 
   <canvas id="gameCanvas"></canvas>

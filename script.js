@@ -17,7 +17,7 @@ const deathQuitBtn = document.getElementById('deathQuitBtn');
 
 let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
-const WORLD_HEIGHT = 3200;
+const WORLD_HEIGHT = 4200;
 const GOAL_Y = 120;
 
 const keys = {
@@ -98,19 +98,19 @@ function createPlatforms() {
   platforms = [];
   platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0 });
   const rows = [];
-  for (let y = WORLD_HEIGHT - 180; y > GOAL_Y + 140; y -= 210) {
+  for (let y = WORLD_HEIGHT - 180; y > GOAL_Y + 80; y -= 180) {
     rows.push(y);
   }
-  const column = [40, 200, 360, 520];
+  const column = [40, 180, 330, 500, 660];
   rows.forEach((y, index) => {
     const x = column[index % column.length];
-    const width = Math.max(140, 240 - index * 8);
+    const width = Math.max(120, 260 - index * 10);
     const variant = index % 7 === 2 ? 'breakable' : index % 5 === 3 ? 'ice' : 'normal';
-    platforms.push({ x, y, width, height: 20, type: 'platform', variant, waitTime: 0 });
+    platforms.push({ x, y, width, height: 24, type: 'platform', variant, waitTime: 0 });
     if (index % 2 === 0) {
-      const altWidth = Math.max(120, width * 0.75);
+      const altWidth = Math.max(110, width * 0.7);
       const altVariant = (index + 3) % 8 === 0 ? 'ice' : 'normal';
-      platforms.push({ x: WIDTH - x - altWidth, y: y - 120, width: altWidth, height: 20, type: 'platform', variant: altVariant, waitTime: 0 });
+      platforms.push({ x: WIDTH - x - altWidth, y: y - 110, width: altWidth, height: 24, type: 'platform', variant: altVariant, waitTime: 0 });
     }
   });
 }
@@ -145,15 +145,18 @@ function drawLives() {
   livesEl.innerHTML = '';
   const total = 9;
   for (let i = 0; i < total; i += 1) {
-    const img = document.createElement('img');
     if (assets.heart) {
+      const img = document.createElement('img');
       img.src = 'assets/heart.png';
+      img.alt = '♥';
+      if (i >= lives) img.classList.add('empty');
+      livesEl.appendChild(img);
     } else {
-      img.textContent = '♥';
+      const span = document.createElement('span');
+      span.textContent = '♥';
+      if (i >= lives) span.style.opacity = '0.4';
+      livesEl.appendChild(span);
     }
-    img.alt = '♥';
-    if (i >= lives) img.classList.add('empty');
-    livesEl.appendChild(img);
   }
 }
 
@@ -366,8 +369,10 @@ function drawPlatforms() {
 function drawCat() {
   const px = Math.round(player.x);
   const py = Math.round(player.y - cameraY);
-  const w = player.width;
-  const h = player.height;
+  const w = Math.round(player.width * 1.45);
+  const h = Math.round(player.height * 1.45);
+  const drawX = px - Math.round((w - player.width) / 2);
+  const drawY = py - Math.round(h - player.height);
   const now = Date.now();
   const moving = keys.left || keys.right;
   if (moving) {
@@ -391,12 +396,11 @@ function drawCat() {
   if (sprite) {
     ctx.save();
     if (!player.facingRight) {
-      // Flip horizontally: translate to right edge and scale left
-      ctx.translate(px + w, py);
+      ctx.translate(drawX + w, drawY);
       ctx.scale(-1, 1);
       ctx.drawImage(sprite, 0, 0, w, h);
     } else {
-      ctx.drawImage(sprite, px, py, w, h);
+      ctx.drawImage(sprite, drawX, drawY, w, h);
     }
     ctx.restore();
     return;
@@ -488,15 +492,18 @@ function applyPhysics() {
 
   // landing and fall-damage detection
   if (!wasOnGround && player.onGround) {
-    // just landed - lose a life from any fall
     if (dropStartY !== null) {
-      lives -= 1;
-      drawLives();
-      if (lives <= 0) {
-        gameState = 'death';
-        showScreen('death');
-        hud.classList.add('hidden');
-        return;
+      const fallPixels = dropStartY - player.y;
+      const fallThreshold = 50 * 10; // 50 meters -> 500 pixels
+      if (fallPixels >= fallThreshold) {
+        lives -= 1;
+        drawLives();
+        if (lives <= 0) {
+          gameState = 'death';
+          showScreen('death');
+          hud.classList.add('hidden');
+          return;
+        }
       }
     }
     dropStartY = null;
