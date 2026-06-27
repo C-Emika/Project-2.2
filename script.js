@@ -1018,8 +1018,8 @@ function drawSpriteTiledHorizontally(img, x, y, width, height) {
     return;
   }
 
-  // Never upscale sprite pixels; only downscale when needed to avoid oversized art.
-  const uniformScale = Math.min(height / sourceH, 1);
+  // Scale sprite to platform height so the platform face is fully covered.
+  const uniformScale = height / sourceH;
   const drawHeight = Math.max(1, Math.round(sourceH * uniformScale));
   const tileWidth = Math.max(1, Math.round(sourceW * uniformScale));
   const endX = x + width;
@@ -1050,7 +1050,7 @@ function drawPlatforms() {
       return;
     }
 
-    const useGrassPlatform = plat.type === 'platform' && plat.variant !== 'ice' && platformArt;
+    const useGrassPlatform = plat.type === 'platform' && platformArt;
     if (useGrassPlatform) {
       if (plat.biome === 'earth') {
         ctx.fillStyle = '#6b4b2d';
@@ -1147,7 +1147,7 @@ function drawCat() {
   }
 
   // Sitting: manual crouch with Down/S, or automatic idle sit.
-  const autoSit = !moving && (now - lastMoveTime > 2000) && player.onGround;
+  const autoSit = !moving && (now - lastMoveTime > 5000) && player.onGround;
   const manualSit = keys.down && player.onGround;
   isSitting = manualSit || autoSit;
 
