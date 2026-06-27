@@ -131,7 +131,7 @@ canvas {
 #titleScreen .screen-panel p,
 #winScreen .screen-panel p,
 #deathScreen .screen-panel p {
-  font-size: clamp(14px, 1.8vw, 16px);
+  font-size: clamp(16px, 2vw, 18px);
 }
 
 h1, h2 {
@@ -150,6 +150,7 @@ p, li, button, .hud, #hud div, .button-row, .screen-panel, ul {
 }
 
 p, li {
+  font-size: var(--ui-body-size);
   line-height: 1.6;
   margin-bottom: 6px;
 }
