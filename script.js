@@ -20,6 +20,13 @@ const warningTitle = document.getElementById('warningTitle');
 const warningMessage = document.getElementById('warningMessage');
 const warningConfirmBtn = document.getElementById('warningConfirmBtn');
 const warningCancelBtn = document.getElementById('warningCancelBtn');
+const tutorialOverlay = document.getElementById('tutorialOverlay');
+const tutorialPanel = document.getElementById('tutorialPanel');
+const tutorialStepCount = document.getElementById('tutorialStepCount');
+const tutorialTitle = document.getElementById('tutorialTitle');
+const tutorialMessage = document.getElementById('tutorialMessage');
+const tutorialNextBtn = document.getElementById('tutorialNextBtn');
+const tutorialSkipBtn = document.getElementById('tutorialSkipBtn');
 const mobileControls = document.getElementById('mobileControls');
 const mobileLeft = document.getElementById('mobileLeft');
 const mobileRight = document.getElementById('mobileRight');
@@ -95,6 +102,57 @@ const spriteFrameCache = new WeakMap();
 let warningAction = null;
 let selectedHat = 'none';
 const unlockedHats = new Set(['none']);
+let tutorialActive = false;
+let tutorialStepIndex = 0;
+let highlightedTutorialTarget = null;
+
+const tutorialSteps = [
+  {
+    title: 'Goal',
+    message: 'Reach the Space Gate by climbing upward. You have 9 lives, so recover quickly after falls.',
+    target: 'goal',
+  },
+  {
+    title: 'Lives',
+    message: 'This shows your remaining lives. If it reaches 0, the run ends.',
+    target: 'lives',
+  },
+  {
+    title: 'Coins',
+    message: 'Collect coins from platforms during your climb.',
+    target: 'coins',
+  },
+  {
+    title: 'Height',
+    message: 'Height tracks your climb progress in meters.',
+    target: 'height',
+  },
+  {
+    title: 'Shop Button',
+    message: 'Open the shop here to buy and equip hats with your coins.',
+    target: 'shopBtn',
+  },
+  {
+    title: 'Reset Button',
+    message: 'Reset restarts from the beginning and clears progress after confirmation.',
+    target: 'resetBtn',
+  },
+  {
+    title: 'Quit Button',
+    message: 'Quit saves your current run and returns to title after confirmation.',
+    target: 'quitBtn',
+  },
+  {
+    title: 'Movement',
+    message: 'Use Left/Right or A/D to move. Jump with Up, W, or Space. Double jump helps reach higher platforms.',
+    target: 'gameCanvas',
+  },
+  {
+    title: 'Crouch And Mobile',
+    message: 'Hold Down or S to crouch/crawl. On mobile, use the on-screen controls in the lower center.',
+    target: 'mobileControls',
+  },
+];
 
 const hatCatalog = [
   { id: 'none', label: 'No Hat', cost: 0, color: '#ffffff' },
@@ -126,6 +184,108 @@ function hideWarningModal() {
     warningOverlay.classList.add('hidden');
     warningOverlay.classList.remove('active');
   }
+}
+
+function clearTutorialHighlight() {
+  if (highlightedTutorialTarget) {
+    highlightedTutorialTarget.classList.remove('tutorial-highlight');
+    highlightedTutorialTarget = null;
+  }
+}
+
+function getTutorialTargetRect(step) {
+  if (!step || !step.target) return null;
+  const targetEl = document.getElementById(step.target);
+  if (!targetEl || step.target === 'mobileControls' && targetEl.classList.contains('hidden')) return null;
+  const rect = targetEl.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  return { rect, targetEl };
+}
+
+function positionTutorialPanel(targetRect) {
+  if (!tutorialPanel) return;
+  const margin = 12;
+  const gap = 14;
+  const panelRect = tutorialPanel.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  let panelX = Math.round((vw - panelRect.width) / 2);
+  let panelY = Math.round((vh - panelRect.height) / 2);
+  let arrow = 'none';
+  let arrowLeft = panelRect.width / 2;
+
+  if (targetRect) {
+    const targetCenterX = targetRect.left + targetRect.width / 2;
+    const targetCenterY = targetRect.top + targetRect.height / 2;
+    const placeBelow = targetCenterY < vh * 0.44;
+    panelY = placeBelow
+      ? Math.round(targetRect.bottom + gap)
+      : Math.round(targetRect.top - panelRect.height - gap);
+    panelX = Math.round(targetCenterX - panelRect.width / 2);
+    panelX = clamp(panelX, margin, vw - panelRect.width - margin);
+    panelY = clamp(panelY, margin, vh - panelRect.height - margin);
+    arrow = placeBelow ? 'up' : 'down';
+    arrowLeft = clamp(targetCenterX - panelX, 24, panelRect.width - 24);
+  }
+
+  tutorialPanel.style.left = `${panelX}px`;
+  tutorialPanel.style.top = `${panelY}px`;
+  tutorialPanel.dataset.arrow = arrow;
+  tutorialPanel.style.setProperty('--arrow-left', `${arrowLeft}px`);
+}
+
+function renderTutorialStep() {
+  if (!tutorialActive || !tutorialPanel || !tutorialOverlay) return;
+  const step = tutorialSteps[tutorialStepIndex];
+  if (!step) return;
+
+  clearTutorialHighlight();
+  tutorialStepCount.textContent = `Step ${tutorialStepIndex + 1}/${tutorialSteps.length}`;
+  tutorialTitle.textContent = step.title;
+  tutorialMessage.textContent = step.message;
+  tutorialNextBtn.textContent = tutorialStepIndex === tutorialSteps.length - 1 ? 'Finish' : 'Next';
+
+  const target = getTutorialTargetRect(step);
+  if (target && step.target !== 'gameCanvas' && step.target !== 'mobileControls') {
+    highlightedTutorialTarget = target.targetEl;
+    highlightedTutorialTarget.classList.add('tutorial-highlight');
+  }
+  positionTutorialPanel(target ? target.rect : null);
+}
+
+function endGuidedTutorial() {
+  tutorialActive = false;
+  tutorialStepIndex = 0;
+  clearTutorialHighlight();
+  if (!tutorialOverlay) return;
+  tutorialOverlay.classList.add('hidden');
+  tutorialOverlay.classList.remove('active');
+}
+
+function startGuidedTutorial() {
+  hideWarningModal();
+  closeShop();
+  showScreen('none');
+  if (gameState !== 'playing') {
+    resetGame();
+  }
+  hud.classList.remove('hidden');
+  tutorialActive = true;
+  tutorialStepIndex = 0;
+  tutorialOverlay.classList.remove('hidden');
+  tutorialOverlay.classList.add('active');
+  renderTutorialStep();
+}
+
+function nextTutorialStep() {
+  if (!tutorialActive) return;
+  if (tutorialStepIndex >= tutorialSteps.length - 1) {
+    endGuidedTutorial();
+    return;
+  }
+  tutorialStepIndex += 1;
+  renderTutorialStep();
 }
 
 function updateCoinsHUD() {
@@ -337,6 +497,7 @@ function hitPlayer() {
   damageCooldown = 90;
   lives -= 1;
   if (lives <= 0) {
+    endGuidedTutorial();
     gameState = 'death';
     showScreen('death');
     hud.classList.add('hidden');
@@ -676,6 +837,7 @@ function showScreen(screen) {
 }
 
 function startGame() {
+  endGuidedTutorial();
   if (gameState === 'title' && restoreProgress()) {
     return;
   }
@@ -691,6 +853,7 @@ function startGame() {
 }
 
 function winGame() {
+  endGuidedTutorial();
   gameState = 'win';
   spawnConfetti();
   showScreen('win');
@@ -1096,6 +1259,7 @@ function applyPhysics() {
         lives -= 1;
         drawLives();
         if (lives <= 0) {
+          endGuidedTutorial();
           gameState = 'death';
           showScreen('death');
           hud.classList.add('hidden');
@@ -1206,6 +1370,7 @@ function applyPhysics() {
   if (player.y > WORLD_HEIGHT + 120) {
     lives -= 1;
     if (lives <= 0) {
+      endGuidedTutorial();
       gameState = 'death';
       showScreen('death');
       hud.classList.add('hidden');
@@ -1325,7 +1490,7 @@ if (startBtn) {
 }
 if (introBtn) {
   introBtn.addEventListener('click', () => {
-    showScreen('intro');
+    startGuidedTutorial();
   });
 }
 if (backBtn) {
@@ -1343,6 +1508,7 @@ if (playAgainBtn) {
 
 if (resetBtn) {
   resetBtn.addEventListener('click', () => {
+    if (tutorialActive) return;
     showWarningModal(
       'Reset Progress?',
       'Reset fully restarts the game, clears saved progress, and returns to the title screen.',
@@ -1358,6 +1524,7 @@ if (resetBtn) {
 
 if (quitBtn) {
   quitBtn.addEventListener('click', () => {
+    if (tutorialActive) return;
     showWarningModal(
       'Quit to Title?',
       'Quit saves current progress and exits to the title screen.',
@@ -1373,6 +1540,7 @@ if (quitBtn) {
 
 if (shopBtn) {
   shopBtn.addEventListener('click', () => {
+    if (tutorialActive) return;
     openShop();
   });
 }
@@ -1399,6 +1567,11 @@ if (deathQuitBtn) {
 }
 
 window.addEventListener('keydown', (event) => {
+  if (tutorialActive) {
+    if (event.code === 'Escape') endGuidedTutorial();
+    event.preventDefault();
+    return;
+  }
   if (shopOverlay && !shopOverlay.classList.contains('hidden')) {
     if (event.code === 'Escape') closeShop();
     event.preventDefault();
@@ -1412,6 +1585,10 @@ window.addEventListener('keydown', (event) => {
   handleInput(event, true);
 });
 window.addEventListener('keyup', (event) => {
+  if (tutorialActive) {
+    event.preventDefault();
+    return;
+  }
   handleInput(event, false);
 });
 
@@ -1440,6 +1617,18 @@ if (warningConfirmBtn) {
 if (warningCancelBtn) {
   warningCancelBtn.addEventListener('click', () => {
     hideWarningModal();
+  });
+}
+
+if (tutorialNextBtn) {
+  tutorialNextBtn.addEventListener('click', () => {
+    nextTutorialStep();
+  });
+}
+
+if (tutorialSkipBtn) {
+  tutorialSkipBtn.addEventListener('click', () => {
+    endGuidedTutorial();
   });
 }
 
@@ -1488,6 +1677,9 @@ bindMobileControl(
 
 setMobileControlsVisibility();
 window.addEventListener('resize', setMobileControlsVisibility);
+window.addEventListener('resize', () => {
+  if (tutorialActive) renderTutorialStep();
+});
 // load optional assets then start
 loadAssets().finally(() => {
   drawLives();

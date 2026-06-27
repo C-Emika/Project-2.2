@@ -331,6 +331,77 @@ button:hover {
   margin-top: 8px;
 }
 
+.tutorial-overlay {
+  z-index: 35;
+  background: rgba(5, 10, 26, 0.35);
+  pointer-events: none;
+}
+
+.tutorial-panel {
+  position: fixed;
+  width: min(420px, 92vw);
+  background: #101735;
+  border: 4px solid #6a6fc9;
+  border-radius: 2px;
+  padding: 16px;
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
+  pointer-events: auto;
+}
+
+.tutorial-panel::after {
+  content: '';
+  position: absolute;
+  left: var(--arrow-left, 50%);
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+}
+
+.tutorial-panel[data-arrow='up']::after {
+  top: -16px;
+  border-bottom: 16px solid #6a6fc9;
+}
+
+.tutorial-panel[data-arrow='down']::after {
+  bottom: -16px;
+  border-top: 16px solid #6a6fc9;
+}
+
+.tutorial-panel[data-arrow='none']::after {
+  display: none;
+}
+
+.tutorial-step-count {
+  font-size: clamp(13px, 1.6vw, 15px);
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+.tutorial-panel h2 {
+  font-size: clamp(28px, 3.8vw, 38px);
+  margin-bottom: 6px;
+}
+
+.tutorial-panel p {
+  font-size: clamp(14px, 1.8vw, 16px);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.tutorial-actions {
+  margin-top: 8px;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 36;
+  outline: 3px dashed #ffd68f;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(18, 26, 58, 0.8);
+}
+
 .mobile-controls {
   position: fixed;
   left: 50%;
