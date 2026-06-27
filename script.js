@@ -80,10 +80,14 @@ const assets = {
   catStand: null,
   catWalk1: null,
   catWalk2: null,
+  catCrawl1: null,
+  catCrawl2: null,
   bgTitle: null,
 };
 let walkFrame = 0;
 let walkTimer = 0;
+let crawlFrame = 0;
+let crawlTimer = 0;
 let lastMoveTime = Date.now();
 let isSitting = false;
 let savedProgress = null;
@@ -608,6 +612,8 @@ function loadAssets(basePath = 'assets') {
     loadFirst(['cat_standNew.png', 'cat_stand_new.png', 'cat_standNEW.png', 'cat_stand.png']).then((i) => (assets.catStand = i)),
     loadFirst(['cat_walk1New.png', 'cat_walk1_new.png', 'cat_walk1NEW.png', 'cat_walk1.png']).then((i) => (assets.catWalk1 = i)),
     loadFirst(['cat_walk2New.png', 'cat_walk2_new.png', 'cat_walk2NEW.png', 'cat_walk2.png']).then((i) => (assets.catWalk2 = i)),
+    loadFirst(['cat_crawl1New.png', 'cat_crawl1_new.png', 'cat_crawl1NEW.png', 'cat_crawl1.png']).then((i) => (assets.catCrawl1 = i)),
+    loadFirst(['cat_crawl2New.png', 'cat_crawl2_new.png', 'cat_crawl2NEW.png', 'cat_crawl2.png']).then((i) => (assets.catCrawl2 = i)),
     load(`${basePath}/bg_title.png`).then((i) => (assets.bgTitle = i)),
   ]).catch(() => {});
 }
@@ -918,15 +924,28 @@ function drawCat() {
   isSitting = manualSit || autoSit;
 
   let sprite = null;
-  if (isSitting && assets.catSit) sprite = assets.catSit;
-  else if (moving && assets.catWalk1 && assets.catWalk2) {
+  if (manualSit && assets.catCrawl1 && assets.catCrawl2) {
+    crawlTimer += 16;
+    if (crawlTimer >= 500) {
+      crawlTimer = 0;
+      crawlFrame = (crawlFrame + 1) % 2;
+    }
+    sprite = crawlFrame === 0 ? assets.catCrawl1 : assets.catCrawl2;
+  } else if (isSitting && assets.catSit) {
+    crawlTimer = 0;
+    sprite = assets.catSit;
+  } else if (moving && assets.catWalk1 && assets.catWalk2) {
+    crawlTimer = 0;
     walkTimer += 16;
     if (walkTimer >= 500) {
       walkTimer = 0;
       walkFrame = (walkFrame + 1) % 2;
     }
     sprite = walkFrame === 0 ? assets.catWalk1 : assets.catWalk2;
-  } else if (assets.catStand) sprite = assets.catStand;
+  } else if (assets.catStand) {
+    crawlTimer = 0;
+    sprite = assets.catStand;
+  }
 
   if (sprite) {
     // scale the image using its natural size so any internal trimming in the
