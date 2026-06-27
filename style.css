@@ -228,6 +228,15 @@ button:hover {
   min-width: 84px;
 }
 
+#coins,
+#height,
+#goal {
+  min-width: 122px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 #hudRight {
   display: flex;
   gap: 12px;

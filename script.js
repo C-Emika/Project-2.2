@@ -525,6 +525,21 @@ function createPlatforms() {
   coins = [];
   platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
 
+  const pickVariantForBiome = (biome) => {
+    const roll = Math.random();
+    if (biome === 'earth') {
+      return roll < 0.16 ? 'breakable' : 'normal';
+    }
+    if (biome === 'cloud') {
+      if (roll < 0.12) return 'breakable';
+      if (roll < 0.34) return 'ice';
+      return 'normal';
+    }
+    if (roll < 0.10) return 'breakable';
+    if (roll < 0.38) return 'ice';
+    return 'normal';
+  };
+
   const minGapY = 165;
   const maxGapY = 220;
   const maxStepX = 170;
@@ -539,8 +554,7 @@ function createPlatforms() {
     const altitude = WORLD_HEIGHT - y;
     const biome = altitude < 3500 ? 'earth' : altitude < 7300 ? 'cloud' : 'space';
     const flowerDensity = Math.max(0, 1 - altitude / 4500);
-    const variantRoll = Math.random();
-    const variant = variantRoll < 0.14 ? 'breakable' : variantRoll < 0.28 ? 'ice' : 'normal';
+    const variant = pickVariantForBiome(biome);
 
     platforms.push({ x: mainX, y, width, height: 24, type: 'platform', variant, waitTime: 0, biome, flowerDensity });
     // Coins only spawn on stable platform tops so every coin is collectible.
@@ -558,8 +572,7 @@ function createPlatforms() {
       const sideAlt = WORLD_HEIGHT - sideY;
       const sideBiome = sideAlt < 3500 ? 'earth' : sideAlt < 7300 ? 'cloud' : 'space';
       const sideFlowerDensity = Math.max(0, 1 - sideAlt / 4500);
-      const sideRoll = Math.random();
-      const sideVariant = sideRoll < 0.1 ? 'breakable' : sideRoll < 0.24 ? 'ice' : 'normal';
+      const sideVariant = pickVariantForBiome(sideBiome);
       platforms.push({ x: sideX, y: sideY, width: sideWidth, height: 24, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity });
       if (sideVariant !== 'breakable' && Math.random() < 0.40) {
         coins.push({ x: sideX + sideWidth / 2, y: sideY - 16, collected: false });
