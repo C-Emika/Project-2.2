@@ -198,7 +198,10 @@ function renderShop() {
     btn.disabled = selected;
     btn.addEventListener('click', () => {
       const hasHat = unlockedHats.has(hat.id);
-      if (!hasHat && coinBalance < hat.cost) return;
+      if (!hasHat && coinBalance < hat.cost) {
+        showWarningModal('Insufficient Funds', 'Insufficient Funds', () => {});
+        return;
+      }
       if (!hasHat) {
         coinBalance -= hat.cost;
         unlockedHats.add(hat.id);
@@ -314,22 +317,8 @@ function drawCoinBursts() {
 }
 
 function createSpaceHazards() {
+  // Space debris removed per current design request.
   spaceHazards = [];
-  platforms.forEach((plat) => {
-    if (plat.type !== 'platform' || plat.biome !== 'space') return;
-    if (Math.random() > 0.18) return;
-    const range = Math.max(40, Math.min(220, plat.width * 0.45));
-    const cx = plat.x + plat.width / 2;
-    spaceHazards.push({
-      x: cx,
-      y: plat.y - 26,
-      w: 16,
-      h: 14,
-      vx: Math.random() < 0.5 ? 0.6 : -0.6,
-      minX: cx - range,
-      maxX: cx + range,
-    });
-  });
 }
 
 function drawSpaceHazards() {
@@ -536,9 +525,9 @@ function createPlatforms() {
   coins = [];
   platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
 
-  const minGapY = 130;
-  const maxGapY = 168;
-  const maxStepX = 190;
+  const minGapY = 165;
+  const maxGapY = 220;
+  const maxStepX = 170;
   let y = WORLD_HEIGHT - 180;
   let mainX = Math.max(16, WIDTH / 2 - 120);
 
@@ -554,16 +543,17 @@ function createPlatforms() {
     const variant = variantRoll < 0.14 ? 'breakable' : variantRoll < 0.28 ? 'ice' : 'normal';
 
     platforms.push({ x: mainX, y, width, height: 24, type: 'platform', variant, waitTime: 0, biome, flowerDensity });
-    if (Math.random() < 0.5) {
+    // Coins only spawn on stable platform tops so every coin is collectible.
+    if (variant !== 'breakable' && Math.random() < 0.55) {
       coins.push({ x: mainX + width / 2, y: y - 16, collected: false });
     }
 
     // optional secondary platform, still reachable from the main path
-    if (Math.random() < 0.48) {
+    if (Math.random() < 0.28) {
       const sideWidth = Math.max(110, width * (0.62 + Math.random() * 0.24));
-      const sideOffsetX = (Math.random() < 0.5 ? -1 : 1) * (70 + Math.random() * 110);
+      const sideOffsetX = (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 150);
       const sideX = Math.max(16, Math.min(mainX + sideOffsetX, WIDTH - sideWidth - 16));
-      const sideRise = 24 + Math.random() * 74;
+      const sideRise = 95 + Math.random() * 50;
       const sideY = Math.max(GOAL_Y + 84, y - sideRise);
       const sideAlt = WORLD_HEIGHT - sideY;
       const sideBiome = sideAlt < 3500 ? 'earth' : sideAlt < 7300 ? 'cloud' : 'space';
@@ -571,7 +561,7 @@ function createPlatforms() {
       const sideRoll = Math.random();
       const sideVariant = sideRoll < 0.1 ? 'breakable' : sideRoll < 0.24 ? 'ice' : 'normal';
       platforms.push({ x: sideX, y: sideY, width: sideWidth, height: 24, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity });
-      if (Math.random() < 0.36) {
+      if (sideVariant !== 'breakable' && Math.random() < 0.40) {
         coins.push({ x: sideX + sideWidth / 2, y: sideY - 16, collected: false });
       }
     }
@@ -925,12 +915,19 @@ function drawCat() {
 
   let sprite = null;
   if (manualSit && assets.catCrawl1 && assets.catCrawl2) {
-    crawlTimer += 16;
-    if (crawlTimer >= 500) {
+    // Only animate crawl while player is actively moving left/right.
+    if (moving) {
+      crawlTimer += 16;
+      if (crawlTimer >= 500) {
+        crawlTimer = 0;
+        crawlFrame = (crawlFrame + 1) % 2;
+      }
+      sprite = crawlFrame === 0 ? assets.catCrawl1 : assets.catCrawl2;
+    } else {
       crawlTimer = 0;
-      crawlFrame = (crawlFrame + 1) % 2;
+      crawlFrame = 0;
+      sprite = assets.catCrawl1;
     }
-    sprite = crawlFrame === 0 ? assets.catCrawl1 : assets.catCrawl2;
   } else if (isSitting && assets.catSit) {
     crawlTimer = 0;
     sprite = assets.catSit;
@@ -1265,6 +1262,12 @@ function handleInput(event, isDown) {
     keys.down = isDown;
     if (isDown && player.onGround) {
       isSitting = true;
+    } else if (!isDown) {
+      // Releasing crouch should return to standing and not trigger idle-sit instantly.
+      isSitting = false;
+      lastMoveTime = Date.now();
+      crawlTimer = 0;
+      crawlFrame = 0;
     }
     event.preventDefault();
   }
@@ -1275,7 +1278,6 @@ function draw() {
   drawBackground();
   drawPlants();
   drawPlatforms();
-  drawSpaceHazards();
   drawCoins();
   drawCoinBursts();
   drawGoal();
