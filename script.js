@@ -90,6 +90,10 @@ const assets = {
   catCrawl1: null,
   catCrawl2: null,
   bgTitle: null,
+  grassSmall: null,
+  grassMedium: null,
+  grassLarge: null,
+  groundGrass: null,
 };
 let walkFrame = 0;
 let walkTimer = 0;
@@ -758,15 +762,21 @@ function createStars() {
 }
 
 function loadAssets(basePath = 'assets') {
+  const encodeAssetPath = (src) => src.split('/').map((seg) => encodeURIComponent(seg)).join('/');
   const load = (src) => new Promise((res) => {
     const img = new Image();
     img.onload = () => res(img);
     img.onerror = () => res(null);
-    img.src = src;
+    img.src = encodeAssetPath(src);
   });
 
   const loadFirst = (names) => names.reduce(
     (p, name) => p.then((img) => img || load(`${basePath}/${name}`)),
+    Promise.resolve(null)
+  );
+
+  const loadFirstPaths = (paths) => paths.reduce(
+    (p, path) => p.then((img) => img || load(path)),
     Promise.resolve(null)
   );
 
@@ -779,6 +789,24 @@ function loadAssets(basePath = 'assets') {
     loadFirst(['cat_crawl1New.png', 'cat_crawl1_new.png', 'cat_crawl1NEW.png', 'cat_crawl1.png']).then((i) => (assets.catCrawl1 = i)),
     loadFirst(['cat_crawl2New.png', 'cat_crawl2_new.png', 'cat_crawl2NEW.png', 'cat_crawl2.png']).then((i) => (assets.catCrawl2 = i)),
     load(`${basePath}/bg_title.png`).then((i) => (assets.bgTitle = i)),
+    loadFirstPaths([
+      'Vibe Coding Assets (3) #8 Small Grass Platform.png',
+      `${basePath}/Vibe Coding Assets (3) #8 Small Grass Platform.png`,
+    ]).then((i) => (assets.grassSmall = i)),
+    // Name correction: file labeled #10 Large is the medium platform art.
+    loadFirstPaths([
+      'Vibe Coding Assets (3) #10 Large Grass Platform.png',
+      `${basePath}/Vibe Coding Assets (3) #10 Large Grass Platform.png`,
+    ]).then((i) => (assets.grassMedium = i)),
+    // Name correction: file labeled #9 Medium is the large platform art.
+    loadFirstPaths([
+      'Vibe Coding Assets (3) #9 Medium Grass Platform.png',
+      `${basePath}/Vibe Coding Assets (3) #9 Medium Grass Platform.png`,
+    ]).then((i) => (assets.grassLarge = i)),
+    loadFirstPaths([
+      'Vibe Coding Assets (3) #11 Ground Grass.png',
+      `${basePath}/Vibe Coding Assets (3) #11 Ground Grass.png`,
+    ]).then((i) => (assets.groundGrass = i)),
   ]).catch(() => {});
 }
 
@@ -975,20 +1003,42 @@ function drawPlant(x, y, height, color) {
 function drawPlatforms() {
   platforms.forEach((plat) => {
     const screenY = plat.y - cameraY;
-    if (plat.type === 'ground') {
-      ctx.fillStyle = '#6b4b2d';
-    } else {
-      if (plat.biome === 'earth') {
-        ctx.fillStyle = '#6b4b2d';
-      } else if (plat.biome === 'cloud') {
-        ctx.fillStyle = '#e7f4ff';
-      } else {
-        ctx.fillStyle = '#83889a';
-      }
+    const platformArt = plat.width >= 220
+      ? assets.grassLarge
+      : plat.width >= 165
+        ? assets.grassMedium
+        : assets.grassSmall;
+
+    if (plat.type === 'ground' && assets.groundGrass) {
+      ctx.drawImage(assets.groundGrass, plat.x, screenY, plat.width, plat.height);
+      return;
     }
-    ctx.fillRect(plat.x, screenY, plat.width, plat.height);
+
+    const useGrassPlatform = plat.type === 'platform' && plat.variant !== 'ice' && platformArt;
+    if (useGrassPlatform) {
+      ctx.drawImage(platformArt, plat.x, screenY, plat.width, plat.height);
+    }
 
     if (plat.type === 'ground') {
+      if (!assets.groundGrass) {
+        ctx.fillStyle = '#6b4b2d';
+      }
+    } else {
+      if (!useGrassPlatform) {
+        if (plat.biome === 'earth') {
+          ctx.fillStyle = '#6b4b2d';
+        } else if (plat.biome === 'cloud') {
+          ctx.fillStyle = '#e7f4ff';
+        } else {
+          ctx.fillStyle = '#83889a';
+        }
+      }
+    }
+    if (!useGrassPlatform && !(plat.type === 'ground' && assets.groundGrass)) {
+      ctx.fillRect(plat.x, screenY, plat.width, plat.height);
+    }
+
+    if (plat.type === 'ground' && !assets.groundGrass) {
       ctx.fillStyle = '#3f8c47';
       ctx.fillRect(plat.x, screenY, plat.width, 10);
       for (let i = 0; i < WIDTH; i += 38) {
@@ -1002,7 +1052,7 @@ function drawPlatforms() {
       }
     }
 
-    if (plat.biome === 'earth') {
+    if (plat.biome === 'earth' && !useGrassPlatform) {
       ctx.fillStyle = '#3f8c47';
       ctx.fillRect(plat.x, screenY, plat.width, Math.max(4, plat.height * 0.3));
       const flowers = Math.floor((plat.width / 36) * (plat.flowerDensity || 0));
