@@ -690,25 +690,6 @@ function createPlatforms() {
   coins = [];
   platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
 
-  const getGrassSize = (size) => {
-    const defaults = {
-      small: { width: 140, height: 24 },
-      medium: { width: 210, height: 24 },
-      large: { width: 260, height: 24 },
-    };
-    const spriteBySize = {
-      small: assets.grassSmall,
-      medium: assets.grassMedium,
-      large: assets.grassLarge,
-    };
-    const sprite = spriteBySize[size];
-    if (!sprite) return defaults[size];
-    const naturalW = sprite.naturalWidth || sprite.width;
-    const naturalH = sprite.naturalHeight || sprite.height;
-    if (!naturalW || !naturalH) return defaults[size];
-    return { width: naturalW, height: naturalH };
-  };
-
   const pickGrassSize = (rawWidth) => {
     if (rawWidth >= 220) return 'large';
     if (rawWidth >= 165) return 'medium';
@@ -739,9 +720,7 @@ function createPlatforms() {
   while (y > GOAL_Y + 90) {
     const rawWidth = Math.max(120, 260 - ((WORLD_HEIGHT - y) / 85));
     const spriteSize = pickGrassSize(rawWidth);
-    const grassSize = getGrassSize(spriteSize);
-    const width = grassSize.width;
-    const platformHeight = grassSize.height;
+    const width = rawWidth;
     const rawShift = (Math.random() * 2 - 1) * maxStepX;
     mainX = Math.max(16, Math.min(mainX + rawShift, WIDTH - width - 16));
 
@@ -750,7 +729,7 @@ function createPlatforms() {
     const flowerDensity = Math.max(0, 1 - altitude / 4500);
     const variant = pickVariantForBiome(biome);
 
-    platforms.push({ x: mainX, y, width, height: platformHeight, type: 'platform', variant, waitTime: 0, biome, flowerDensity, spriteSize });
+    platforms.push({ x: mainX, y, width, height: 24, type: 'platform', variant, waitTime: 0, biome, flowerDensity, spriteSize });
     // Coins only spawn on stable platform tops so every coin is collectible.
     if (variant !== 'breakable' && Math.random() < 0.55) {
       coins.push({ x: mainX + width / 2, y: y - 16, collected: false });
@@ -760,9 +739,7 @@ function createPlatforms() {
     if (Math.random() < 0.28) {
       const sideRawWidth = Math.max(110, width * (0.62 + Math.random() * 0.24));
       const sideSpriteSize = pickGrassSize(sideRawWidth);
-      const sideGrassSize = getGrassSize(sideSpriteSize);
-      const sideWidth = sideGrassSize.width;
-      const sideHeight = sideGrassSize.height;
+      const sideWidth = sideRawWidth;
       const sideOffsetX = (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 150);
       const sideX = Math.max(16, Math.min(mainX + sideOffsetX, WIDTH - sideWidth - 16));
       const sideRise = 95 + Math.random() * 50;
@@ -771,7 +748,7 @@ function createPlatforms() {
       const sideBiome = sideAlt < 3500 ? 'earth' : sideAlt < 7300 ? 'cloud' : 'space';
       const sideFlowerDensity = Math.max(0, 1 - sideAlt / 4500);
       const sideVariant = pickVariantForBiome(sideBiome);
-      platforms.push({ x: sideX, y: sideY, width: sideWidth, height: sideHeight, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity, spriteSize: sideSpriteSize });
+      platforms.push({ x: sideX, y: sideY, width: sideWidth, height: 24, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity, spriteSize: sideSpriteSize });
       if (sideVariant !== 'breakable' && Math.random() < 0.40) {
         coins.push({ x: sideX + sideWidth / 2, y: sideY - 16, collected: false });
       }
@@ -1033,6 +1010,31 @@ function drawPlant(x, y, height, color) {
   ctx.fill();
 }
 
+function drawSpriteTiledHorizontally(img, x, y, width, height) {
+  const sourceW = img.naturalWidth || img.width;
+  const sourceH = img.naturalHeight || img.height;
+  if (!sourceW || !sourceH) {
+    ctx.drawImage(img, x, y, width, height);
+    return;
+  }
+
+  // Never upscale sprite pixels; only downscale when needed to avoid oversized art.
+  const uniformScale = Math.min(height / sourceH, 1);
+  const drawHeight = Math.max(1, Math.round(sourceH * uniformScale));
+  const tileWidth = Math.max(1, Math.round(sourceW * uniformScale));
+  const endX = x + width;
+  const drawY = y;
+  let drawX = x;
+
+  while (drawX < endX) {
+    const remaining = endX - drawX;
+    const drawWidth = Math.min(tileWidth, remaining);
+    const sourceSliceWidth = Math.max(1, Math.round(sourceW * (drawWidth / tileWidth)));
+    ctx.drawImage(img, 0, 0, sourceSliceWidth, sourceH, drawX, drawY, drawWidth, drawHeight);
+    drawX += drawWidth;
+  }
+}
+
 function drawPlatforms() {
   platforms.forEach((plat) => {
     const screenY = plat.y - cameraY;
@@ -1050,7 +1052,15 @@ function drawPlatforms() {
 
     const useGrassPlatform = plat.type === 'platform' && plat.variant !== 'ice' && platformArt;
     if (useGrassPlatform) {
-      ctx.drawImage(platformArt, plat.x, screenY, plat.width, plat.height);
+      if (plat.biome === 'earth') {
+        ctx.fillStyle = '#6b4b2d';
+      } else if (plat.biome === 'cloud') {
+        ctx.fillStyle = '#e7f4ff';
+      } else {
+        ctx.fillStyle = '#83889a';
+      }
+      ctx.fillRect(plat.x, screenY, plat.width, plat.height);
+      drawSpriteTiledHorizontally(platformArt, plat.x, screenY, plat.width, plat.height);
     }
 
     if (plat.type === 'ground') {
