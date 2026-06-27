@@ -690,11 +690,22 @@ function createPlatforms() {
   coins = [];
   platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
 
+  const PLATFORM_SIZES = {
+    small: 132,
+    medium: 184,
+    large: 236,
+  };
+
   const pickGrassSize = (rawWidth) => {
     if (rawWidth >= 220) return 'large';
     if (rawWidth >= 165) return 'medium';
     return 'small';
   };
+
+  const getWidthForSize = (size) => PLATFORM_SIZES[size] || PLATFORM_SIZES.medium;
+
+  // Conservative jump envelope for consistent reachability on main path.
+  const getMaxReachableStepX = (gapY) => clamp(210 - gapY * 0.45, 112, 170);
 
   const pickVariantForBiome = (biome) => {
     const roll = Math.random();
@@ -711,16 +722,17 @@ function createPlatforms() {
     return 'normal';
   };
 
-  const minGapY = 165;
-  const maxGapY = 220;
-  const maxStepX = 170;
+  const minGapY = 150;
+  const maxGapY = 198;
   let y = WORLD_HEIGHT - 180;
   let mainX = Math.max(16, WIDTH / 2 - 120);
 
   while (y > GOAL_Y + 90) {
     const rawWidth = Math.max(120, 260 - ((WORLD_HEIGHT - y) / 85));
     const spriteSize = pickGrassSize(rawWidth);
-    const width = rawWidth;
+    const width = getWidthForSize(spriteSize);
+    const gapY = minGapY + Math.random() * (maxGapY - minGapY);
+    const maxStepX = getMaxReachableStepX(gapY);
     const rawShift = (Math.random() * 2 - 1) * maxStepX;
     mainX = Math.max(16, Math.min(mainX + rawShift, WIDTH - width - 16));
 
@@ -737,12 +749,12 @@ function createPlatforms() {
 
     // optional secondary platform, still reachable from the main path
     if (Math.random() < 0.28) {
-      const sideRawWidth = Math.max(110, width * (0.62 + Math.random() * 0.24));
+      const sideRawWidth = Math.max(120, width * (0.7 + Math.random() * 0.2));
       const sideSpriteSize = pickGrassSize(sideRawWidth);
-      const sideWidth = sideRawWidth;
-      const sideOffsetX = (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 150);
+      const sideWidth = getWidthForSize(sideSpriteSize);
+      const sideOffsetX = (Math.random() < 0.5 ? -1 : 1) * (70 + Math.random() * 90);
       const sideX = Math.max(16, Math.min(mainX + sideOffsetX, WIDTH - sideWidth - 16));
-      const sideRise = 95 + Math.random() * 50;
+      const sideRise = 78 + Math.random() * 44;
       const sideY = Math.max(GOAL_Y + 84, y - sideRise);
       const sideAlt = WORLD_HEIGHT - sideY;
       const sideBiome = sideAlt < 3500 ? 'earth' : sideAlt < 7300 ? 'cloud' : 'space';
@@ -754,7 +766,7 @@ function createPlatforms() {
       }
     }
 
-    y -= minGapY + Math.random() * (maxGapY - minGapY);
+    y -= gapY;
   }
   createSpaceHazards();
 }
@@ -1010,31 +1022,6 @@ function drawPlant(x, y, height, color) {
   ctx.fill();
 }
 
-function drawSpriteTiledHorizontally(img, x, y, width, height) {
-  const sourceW = img.naturalWidth || img.width;
-  const sourceH = img.naturalHeight || img.height;
-  if (!sourceW || !sourceH) {
-    ctx.drawImage(img, x, y, width, height);
-    return;
-  }
-
-  // Scale sprite to platform height so the platform face is fully covered.
-  const uniformScale = height / sourceH;
-  const drawHeight = Math.max(1, Math.round(sourceH * uniformScale));
-  const tileWidth = Math.max(1, Math.round(sourceW * uniformScale));
-  const endX = x + width;
-  const drawY = y;
-  let drawX = x;
-
-  while (drawX < endX) {
-    const remaining = endX - drawX;
-    const drawWidth = Math.min(tileWidth, remaining);
-    const sourceSliceWidth = Math.max(1, Math.round(sourceW * (drawWidth / tileWidth)));
-    ctx.drawImage(img, 0, 0, sourceSliceWidth, sourceH, drawX, drawY, drawWidth, drawHeight);
-    drawX += drawWidth;
-  }
-}
-
 function drawPlatforms() {
   platforms.forEach((plat) => {
     const screenY = plat.y - cameraY;
@@ -1050,7 +1037,7 @@ function drawPlatforms() {
       return;
     }
 
-    const useGrassPlatform = plat.type === 'platform' && platformArt;
+    const useGrassPlatform = plat.type === 'platform' && plat.variant !== 'ice' && platformArt;
     if (useGrassPlatform) {
       if (plat.biome === 'earth') {
         ctx.fillStyle = '#6b4b2d';
@@ -1060,7 +1047,7 @@ function drawPlatforms() {
         ctx.fillStyle = '#83889a';
       }
       ctx.fillRect(plat.x, screenY, plat.width, plat.height);
-      drawSpriteTiledHorizontally(platformArt, plat.x, screenY, plat.width, plat.height);
+      ctx.drawImage(platformArt, plat.x, screenY, plat.width, plat.height);
     }
 
     if (plat.type === 'ground') {
