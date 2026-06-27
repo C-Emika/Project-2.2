@@ -1031,71 +1031,17 @@ function drawPlatforms() {
       : spriteKey === 'medium'
         ? assets.grassMedium
         : assets.grassSmall;
+    const fallbackPlatformArt = platformArt || assets.grassMedium || assets.grassLarge || assets.grassSmall;
+    const groundArt = assets.groundGrass || assets.grassLarge || assets.grassMedium || assets.grassSmall;
 
-    if (plat.type === 'ground' && assets.groundGrass) {
-      ctx.drawImage(assets.groundGrass, plat.x, screenY, plat.width, plat.height);
+    if (plat.type === 'ground' && groundArt) {
+      ctx.drawImage(groundArt, plat.x, screenY, plat.width, plat.height);
       return;
     }
 
-    const useGrassPlatform = plat.type === 'platform' && plat.variant !== 'ice' && platformArt;
+    const useGrassPlatform = plat.type === 'platform' && fallbackPlatformArt;
     if (useGrassPlatform) {
-      if (plat.biome === 'earth') {
-        ctx.fillStyle = '#6b4b2d';
-      } else if (plat.biome === 'cloud') {
-        ctx.fillStyle = '#e7f4ff';
-      } else {
-        ctx.fillStyle = '#83889a';
-      }
-      ctx.fillRect(plat.x, screenY, plat.width, plat.height);
-      ctx.drawImage(platformArt, plat.x, screenY, plat.width, plat.height);
-    }
-
-    if (plat.type === 'ground') {
-      if (!assets.groundGrass) {
-        ctx.fillStyle = '#6b4b2d';
-      }
-    } else {
-      if (!useGrassPlatform) {
-        if (plat.biome === 'earth') {
-          ctx.fillStyle = '#6b4b2d';
-        } else if (plat.biome === 'cloud') {
-          ctx.fillStyle = '#e7f4ff';
-        } else {
-          ctx.fillStyle = '#83889a';
-        }
-      }
-    }
-    if (!useGrassPlatform && !(plat.type === 'ground' && assets.groundGrass)) {
-      ctx.fillRect(plat.x, screenY, plat.width, plat.height);
-    }
-
-    if (plat.type === 'ground' && !assets.groundGrass) {
-      ctx.fillStyle = '#3f8c47';
-      ctx.fillRect(plat.x, screenY, plat.width, 10);
-      for (let i = 0; i < WIDTH; i += 38) {
-        const fx = i + 12;
-        const fy = screenY + 3;
-        ctx.fillStyle = '#f4d35e';
-        ctx.fillRect(fx, fy, 2, 2);
-        ctx.fillStyle = '#f26f8b';
-        ctx.fillRect(fx - 2, fy + 2, 2, 2);
-        ctx.fillRect(fx + 2, fy + 2, 2, 2);
-      }
-    }
-
-    if (plat.biome === 'earth' && !useGrassPlatform) {
-      ctx.fillStyle = '#3f8c47';
-      ctx.fillRect(plat.x, screenY, plat.width, Math.max(4, plat.height * 0.3));
-      const flowers = Math.floor((plat.width / 36) * (plat.flowerDensity || 0));
-      for (let i = 0; i < flowers; i += 1) {
-        const fx = plat.x + 12 + i * 20;
-        const fy = screenY + 4;
-        ctx.fillStyle = '#f4d35e';
-        ctx.fillRect(fx, fy, 2, 2);
-        ctx.fillStyle = '#f26f8b';
-        ctx.fillRect(fx - 2, fy + 2, 2, 2);
-        ctx.fillRect(fx + 2, fy + 2, 2, 2);
-      }
+      ctx.drawImage(fallbackPlatformArt, plat.x, screenY, plat.width, plat.height);
     }
 
     if (plat.type === 'platform') {
