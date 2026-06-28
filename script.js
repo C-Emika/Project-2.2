@@ -33,6 +33,7 @@ const mobileRight = document.getElementById('mobileRight');
 const mobileDown = document.getElementById('mobileDown');
 const mobileJump = document.getElementById('mobileJump');
 const shopBtn = document.getElementById('shopBtn');
+const hudIntroBtn = document.getElementById('hudIntroBtn');
 const shopOverlay = document.getElementById('shopOverlay');
 const shopCoins = document.getElementById('shopCoins');
 const shopItems = document.getElementById('shopItems');
@@ -42,6 +43,9 @@ let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
 const WORLD_HEIGHT = 10032;
 const GOAL_Y = 120;
+const GROUND_HEIGHT = 64;
+const GROUND_SINK = 34;
+const GROUND_Y = WORLD_HEIGHT - GROUND_HEIGHT + GROUND_SINK;
 
 const keys = {
   left: false,
@@ -68,7 +72,7 @@ let jumpBufferFrames = 0;
 
 const player = {
   x: WIDTH / 2 - 24,
-  y: WORLD_HEIGHT - 32 - 52,
+  y: GROUND_Y - 52,
   width: 48,
   height: 52,
   vx: 0,
@@ -148,12 +152,13 @@ const tutorialSteps = [
   },
   {
     title: 'Movement',
-    message: 'Use Left/Right or A/D to move. Jump with Up, W, or Space. Double jump helps reach higher platforms.',
+    message: 'Use Left/Right or A/D to move. Jump with Up, W, or Space. Hold Down or S to crouch/crawl. Double jump helps reach higher platforms.',
     target: 'gameCanvas',
+    panelPosition: 'center',
   },
   {
-    title: 'Crouch And Mobile',
-    message: 'Hold Down or S to crouch/crawl. On mobile, use the on-screen controls in the lower center.',
+    title: 'Mobile Controls',
+    message: 'On mobile, use the on-screen controls in the lower center.',
     target: 'mobileControls',
   },
 ];
@@ -239,6 +244,17 @@ function positionTutorialPanel(targetRect) {
   tutorialPanel.style.setProperty('--arrow-left', `${arrowLeft}px`);
 }
 
+function centerTutorialPanel() {
+  if (!tutorialPanel) return;
+  const panelRect = tutorialPanel.getBoundingClientRect();
+  const panelX = Math.round((window.innerWidth - panelRect.width) / 2);
+  const panelY = Math.round((window.innerHeight - panelRect.height) / 2);
+  tutorialPanel.style.left = `${panelX}px`;
+  tutorialPanel.style.top = `${panelY}px`;
+  tutorialPanel.dataset.arrow = 'none';
+  tutorialPanel.style.setProperty('--arrow-left', `${Math.round(panelRect.width / 2)}px`);
+}
+
 function renderTutorialStep() {
   if (!tutorialActive || !tutorialPanel || !tutorialOverlay) return;
   const step = tutorialSteps[tutorialStepIndex];
@@ -254,6 +270,11 @@ function renderTutorialStep() {
   if (target && step.target !== 'gameCanvas' && step.target !== 'mobileControls') {
     highlightedTutorialTarget = target.targetEl;
     highlightedTutorialTarget.classList.add('tutorial-highlight');
+  }
+  if (step.panelPosition === 'center') {
+    positionTutorialPanel(null);
+    centerTutorialPanel();
+    return;
   }
   positionTutorialPanel(target ? target.rect : null);
 }
@@ -508,7 +529,7 @@ function hitPlayer() {
     return;
   }
   player.x = WIDTH / 2 - 24;
-  player.y = Math.max(GOAL_Y + 140, WORLD_HEIGHT - 32 - player.height - 220);
+  player.y = Math.max(GOAL_Y + 140, GROUND_Y - player.height - 220);
   player.vx = 0;
   player.vy = 0;
   player.jumpCount = 0;
@@ -645,7 +666,7 @@ function resetGame(keepProgress = false) {
   }
   savedProgress = null;
   player.x = WIDTH / 2 - 24;
-  player.y = WORLD_HEIGHT - 32 - player.height;
+  player.y = GROUND_Y - player.height;
   player.vx = 0;
   player.vy = 0;
   player.onGround = true;
@@ -685,27 +706,103 @@ function resizeCanvas() {
   cameraY = clamp(player.y - HEIGHT * 0.55, 0, WORLD_HEIGHT - HEIGHT);
 }
 
+function getGrassSpriteForSize(size) {
+  if (size === 'large') return assets.grassLarge;
+  if (size === 'medium') return assets.grassMedium;
+  return assets.grassSmall;
+}
+
+function getPlatformDimensionsForSize(size, targetHeight = 51) {
+  const targetHeightBySize = {
+    small: Math.max(32, Math.round(targetHeight * 1.03)),
+    medium: Math.max(36, Math.round(targetHeight * 1.11)),
+    large: Math.max(41, Math.round(targetHeight * 1.27)),
+  };
+
+  const fallbackBySize = {
+    small: { width: 124, height: 22 },
+    medium: { width: 176, height: 24 },
+    large: { width: 228, height: 26 },
+  };
+  const sprite = getGrassSpriteForSize(size);
+  if (!sprite) return fallbackBySize[size] || fallbackBySize.medium;
+  const frame = getSpriteFrame(sprite);
+  if (!frame || !frame.sw || !frame.sh) return fallbackBySize[size] || fallbackBySize.medium;
+
+  // Uniform X/Y scaling preserves each sprite's pixel proportions (no stretch).
+  const scaledTargetHeight = targetHeightBySize[size] || targetHeightBySize.medium;
+  const scale = scaledTargetHeight / frame.sh;
+  return {
+    width: Math.max(30, Math.round(frame.sw * scale)),
+    height: Math.max(16, Math.round(frame.sh * scale)),
+  };
+}
+
 function createPlatforms() {
   platforms = [];
   coins = [];
-  platforms.push({ x: 0, y: WORLD_HEIGHT - 32, width: WIDTH, height: 32, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
+  platforms.push({ x: 0, y: GROUND_Y, width: WIDTH, height: GROUND_HEIGHT, type: 'ground', variant: 'ground', waitTime: 0, biome: 'earth', flowerDensity: 1 });
 
-  const PLATFORM_SIZES = {
-    small: 132,
-    medium: 184,
-    large: 236,
+  // Keep all grass lengths in circulation while avoiding long same-size streaks.
+  const sizeAge = {
+    small: 0,
+    medium: 2,
+    large: 4,
   };
 
-  const pickGrassSize = (rawWidth) => {
-    if (rawWidth >= 220) return 'large';
-    if (rawWidth >= 165) return 'medium';
-    return 'small';
+  const weightedSizeByBiome = {
+    earth: [
+      { size: 'large', weight: 0.42 },
+      { size: 'medium', weight: 0.36 },
+      { size: 'small', weight: 0.22 },
+    ],
+    cloud: [
+      { size: 'large', weight: 0.34 },
+      { size: 'medium', weight: 0.40 },
+      { size: 'small', weight: 0.26 },
+    ],
+    space: [
+      { size: 'large', weight: 0.28 },
+      { size: 'medium', weight: 0.38 },
+      { size: 'small', weight: 0.34 },
+    ],
   };
 
-  const getWidthForSize = (size) => PLATFORM_SIZES[size] || PLATFORM_SIZES.medium;
+  const pickWeightedSize = (pool) => {
+    let r = Math.random();
+    for (let i = 0; i < pool.length; i += 1) {
+      r -= pool[i].weight;
+      if (r <= 0) return pool[i].size;
+    }
+    return pool[pool.length - 1].size;
+  };
 
-  // Conservative jump envelope for consistent reachability on main path.
-  const getMaxReachableStepX = (gapY) => clamp(210 - gapY * 0.45, 112, 170);
+  const pickGrassSize = (biome, lastSize, sameSizeStreak) => {
+    const overdue = Object.keys(sizeAge).filter((k) => sizeAge[k] >= 6);
+    if (overdue.length > 0) {
+      return overdue[Math.floor(Math.random() * overdue.length)];
+    }
+
+    let chosen = pickWeightedSize(weightedSizeByBiome[biome] || weightedSizeByBiome.cloud);
+    if (sameSizeStreak >= 2 && chosen === lastSize) {
+      const alternatives = ['small', 'medium', 'large'].filter((s) => s !== lastSize);
+      chosen = alternatives[Math.floor(Math.random() * alternatives.length)];
+    }
+    return chosen;
+  };
+
+  const updateSizeAge = (chosenSize) => {
+    Object.keys(sizeAge).forEach((k) => {
+      sizeAge[k] += 1;
+    });
+    sizeAge[chosenSize] = 0;
+  };
+
+  // Conservative edge-gap envelope for consistent reachability on main path.
+  const getMaxReachableEdgeGap = (gapY, targetSize) => {
+    const sizeBonus = targetSize === 'large' ? 14 : targetSize === 'medium' ? 7 : -3;
+    return clamp(184 - gapY * 0.39 + sizeBonus, 74, 142);
+  };
 
   const pickVariantForBiome = (biome) => {
     const roll = Math.random();
@@ -722,48 +819,68 @@ function createPlatforms() {
     return 'normal';
   };
 
-  const minGapY = 150;
-  const maxGapY = 198;
+  const minGapY = 160;
+  const maxGapY = 204;
   let y = WORLD_HEIGHT - 180;
   let mainX = Math.max(16, WIDTH / 2 - 120);
+  let lastMainWidth = 220;
+  let lastMainSize = 'medium';
+  let sameMainSizeStreak = 0;
 
   while (y > GOAL_Y + 90) {
-    const rawWidth = Math.max(120, 260 - ((WORLD_HEIGHT - y) / 85));
-    const spriteSize = pickGrassSize(rawWidth);
-    const width = getWidthForSize(spriteSize);
-    const gapY = minGapY + Math.random() * (maxGapY - minGapY);
-    const maxStepX = getMaxReachableStepX(gapY);
-    const rawShift = (Math.random() * 2 - 1) * maxStepX;
-    mainX = Math.max(16, Math.min(mainX + rawShift, WIDTH - width - 16));
-
     const altitude = WORLD_HEIGHT - y;
     const biome = altitude < 3500 ? 'earth' : altitude < 7300 ? 'cloud' : 'space';
+    const spriteSize = pickGrassSize(biome, lastMainSize, sameMainSizeStreak);
+    const mainDims = getPlatformDimensionsForSize(spriteSize);
+    const width = mainDims.width;
+    const height = mainDims.height;
+    const gapY = minGapY + Math.random() * (maxGapY - minGapY);
+    const maxEdgeGap = getMaxReachableEdgeGap(gapY, spriteSize);
+    const worldMinX = 16;
+    const worldMaxX = WIDTH - width - 16;
+    const minReachX = Math.max(worldMinX, mainX - maxEdgeGap - width);
+    const maxReachX = Math.min(worldMaxX, mainX + lastMainWidth + maxEdgeGap);
+    const rawShift = (Math.random() * 2 - 1) * (maxEdgeGap * 0.95 + width * 0.12);
+    const driftedX = mainX + rawShift;
+    const safeCenterX = mainX + (lastMainWidth - width) / 2;
+    mainX = minReachX <= maxReachX
+      ? clamp(driftedX, minReachX, maxReachX)
+      : clamp(safeCenterX, worldMinX, worldMaxX);
+
     const flowerDensity = Math.max(0, 1 - altitude / 4500);
     const variant = pickVariantForBiome(biome);
 
-    platforms.push({ x: mainX, y, width, height: 24, type: 'platform', variant, waitTime: 0, biome, flowerDensity, spriteSize });
-    // Coins only spawn on stable platform tops so every coin is collectible.
+    platforms.push({ x: mainX, y, width, height, type: 'platform', variant, waitTime: 0, biome, flowerDensity, spriteSize });
+    updateSizeAge(spriteSize);
+    sameMainSizeStreak = spriteSize === lastMainSize ? sameMainSizeStreak + 1 : 1;
+    lastMainSize = spriteSize;
+    lastMainWidth = width;
+
+    // Coins only spawn on the main climb path so every coin remains collectible.
     if (variant !== 'breakable' && Math.random() < 0.55) {
       coins.push({ x: mainX + width / 2, y: y - 16, collected: false });
     }
 
     // optional secondary platform, still reachable from the main path
     if (Math.random() < 0.28) {
-      const sideRawWidth = Math.max(120, width * (0.7 + Math.random() * 0.2));
-      const sideSpriteSize = pickGrassSize(sideRawWidth);
-      const sideWidth = getWidthForSize(sideSpriteSize);
-      const sideOffsetX = (Math.random() < 0.5 ? -1 : 1) * (70 + Math.random() * 90);
-      const sideX = Math.max(16, Math.min(mainX + sideOffsetX, WIDTH - sideWidth - 16));
+      const sideSpriteSize = pickGrassSize(biome, spriteSize, 1);
+      const sideDims = getPlatformDimensionsForSize(sideSpriteSize);
+      const sideWidth = sideDims.width;
+      const sideHeight = sideDims.height;
       const sideRise = 78 + Math.random() * 44;
       const sideY = Math.max(GOAL_Y + 84, y - sideRise);
+      const sideMaxEdgeGap = getMaxReachableEdgeGap(sideRise, sideSpriteSize) + 24;
+      const sideDirection = Math.random() < 0.5 ? -1 : 1;
+      const sideGap = 58 + Math.random() * Math.min(118, sideMaxEdgeGap);
+      const sideAnchorX = sideDirection < 0
+        ? mainX - sideGap - sideWidth
+        : mainX + width + sideGap;
+      const sideX = clamp(sideAnchorX, 16, WIDTH - sideWidth - 16);
       const sideAlt = WORLD_HEIGHT - sideY;
       const sideBiome = sideAlt < 3500 ? 'earth' : sideAlt < 7300 ? 'cloud' : 'space';
       const sideFlowerDensity = Math.max(0, 1 - sideAlt / 4500);
       const sideVariant = pickVariantForBiome(sideBiome);
-      platforms.push({ x: sideX, y: sideY, width: sideWidth, height: 24, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity, spriteSize: sideSpriteSize });
-      if (sideVariant !== 'breakable' && Math.random() < 0.40) {
-        coins.push({ x: sideX + sideWidth / 2, y: sideY - 16, collected: false });
-      }
+      platforms.push({ x: sideX, y: sideY, width: sideWidth, height: sideHeight, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity, spriteSize: sideSpriteSize });
     }
 
     y -= gapY;
@@ -820,13 +937,21 @@ function loadAssets(basePath = 'assets') {
       'Vibe Coding Assets (3) #10 Large Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #10 Large Grass Platform.png`,
     ]).then((i) => (assets.grassMedium = i)),
-    // Name correction: file labeled #9 Medium is the large platform art.
+    // Prefer the newly uploaded large platform art, with the older file as fallback.
     loadFirstPaths([
+      'Vibe Coding Assets (3) #10 Large Grass Platform New.png',
+      `${basePath}/Vibe Coding Assets (3) #10 Large Grass Platform New.png`,
       'Vibe Coding Assets (3) #9 Medium Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #9 Medium Grass Platform.png`,
     ]).then((i) => (assets.grassLarge = i)),
     loadFirstPaths([
+      'Vibe Coding Assets (3) #11 Ground Grass New.png',
+      'Assets/Vibe Coding Assets (3) #11 Ground Grass New.png',
+      'assets/Vibe Coding Assets (3) #11 Ground Grass New.png',
+      `${basePath}/Vibe Coding Assets (3) #11 Ground Grass New.png`,
       'Vibe Coding Assets (3) #11 Ground Grass.png',
+      'Assets/Vibe Coding Assets (3) #11 Ground Grass.png',
+      'assets/Vibe Coding Assets (3) #11 Ground Grass.png',
       `${basePath}/Vibe Coding Assets (3) #11 Ground Grass.png`,
     ]).then((i) => (assets.groundGrass = i)),
   ]).catch(() => {});
@@ -857,8 +982,8 @@ function drawLives() {
 function updateHUD() {
   drawLives();
   updateCoinsHUD();
-  // ground should read as 0 meters (ground platform is 32px high)
-  const heightMeters = Math.max(0, Math.round((WORLD_HEIGHT - player.y - player.height - 32) / 10));
+  // ground should read as 0 meters regardless of ground sprite scale.
+  const heightMeters = Math.max(0, Math.round((GROUND_Y - player.y - player.height) / 10));
   document.getElementById('height').textContent = `Height: ${heightMeters}m`;
 }
 
@@ -980,7 +1105,7 @@ function mixColor(a, b, t) {
 }
 
 function drawPlants() {
-  const groundY = WORLD_HEIGHT - 32;
+  const groundY = GROUND_Y;
   for (let i = 0; i < 7; i += 1) {
     const x = 40 + i * 90;
     drawFlower(x, groundY - 16, 16, '#3c8f52', '#f9e35f', '#f26f8b');
@@ -1035,13 +1160,44 @@ function drawPlatforms() {
     const groundArt = assets.groundGrass || assets.grassLarge || assets.grassMedium || assets.grassSmall;
 
     if (plat.type === 'ground' && groundArt) {
-      ctx.drawImage(groundArt, plat.x, screenY, plat.width, plat.height);
+      const frame = getSpriteFrame(groundArt);
+      const sourceW = frame?.sw || groundArt.naturalWidth || groundArt.width;
+      const sourceH = frame?.sh || groundArt.naturalHeight || groundArt.height;
+      const sourceX = frame?.sx || 0;
+      const sourceY = frame?.sy || 0;
+      if (sourceW > 0 && sourceH > 0) {
+        const scale = plat.height / sourceH;
+        const scaledW = Math.max(1, Math.round(sourceW * scale));
+        // Ground sprite is intentionally long; render one strip instead of repeating.
+        if (scaledW >= plat.width) {
+          const cropW = Math.max(1, Math.round((plat.width / scaledW) * sourceW));
+          const cropX = sourceX + Math.max(0, Math.floor((sourceW - cropW) / 2));
+          ctx.drawImage(groundArt, cropX, sourceY, cropW, sourceH, plat.x, screenY, plat.width, plat.height);
+        } else {
+          ctx.drawImage(groundArt, sourceX, sourceY, sourceW, sourceH, plat.x, screenY, plat.width, plat.height);
+        }
+      }
       return;
     }
 
     const useGrassPlatform = plat.type === 'platform' && fallbackPlatformArt;
     if (useGrassPlatform) {
-      ctx.drawImage(fallbackPlatformArt, plat.x, screenY, plat.width, plat.height);
+      const frame = getSpriteFrame(fallbackPlatformArt);
+      if (frame && frame.sw > 0 && frame.sh > 0) {
+        ctx.drawImage(
+          fallbackPlatformArt,
+          frame.sx,
+          frame.sy,
+          frame.sw,
+          frame.sh,
+          plat.x,
+          screenY,
+          plat.width,
+          plat.height
+        );
+      } else {
+        ctx.drawImage(fallbackPlatformArt, plat.x, screenY, plat.width, plat.height);
+      }
     }
 
     if (plat.type === 'platform') {
@@ -1344,8 +1500,8 @@ function applyPhysics() {
   }
 
   const scale = Math.max(1.0, HEIGHT / 900);
-  const groundJump = -20.8 * scale;
-  const airJump = -18.8 * scale;
+  const groundJump = -19.8 * scale;
+  const airJump = -17.9 * scale;
   if (keys.jump) jumpBufferFrames = 7;
   if ((player.onGround || coyoteFrames > 0) && jumpBufferFrames > 0) {
     player.vy = groundJump;
@@ -1372,7 +1528,7 @@ function applyPhysics() {
       return;
     }
     player.x = WIDTH / 2 - 24;
-    player.y = WORLD_HEIGHT - 32 - player.height;
+    player.y = GROUND_Y - player.height;
     player.vx = 0;
     player.vy = 0;
     player.jumpCount = 0;
@@ -1540,6 +1696,13 @@ if (shopBtn) {
   });
 }
 
+if (hudIntroBtn) {
+  hudIntroBtn.addEventListener('click', () => {
+    if (tutorialActive) return;
+    startGuidedTutorial();
+  });
+}
+
 if (shopCloseBtn) {
   shopCloseBtn.addEventListener('click', () => {
     closeShop();
@@ -1677,6 +1840,7 @@ window.addEventListener('resize', () => {
 });
 // load optional assets then start
 loadAssets().finally(() => {
+  createPlatforms();
   drawLives();
 });
 
