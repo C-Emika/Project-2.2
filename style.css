@@ -332,6 +332,27 @@ button:hover {
   box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
 }
 
+.achievement-panel {
+  width: min(600px, 92vw);
+  background: #121936;
+  border: 4px solid #f4ce46;
+  border-radius: 2px;
+  padding: 22px;
+  text-align: center;
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
+}
+
+.achievement-panel h2 {
+  margin-bottom: 8px;
+  font-size: clamp(30px, 4vw, 44px);
+}
+
+.achievement-panel p {
+  margin-bottom: 12px;
+  line-height: 1.4;
+  font-size: clamp(14px, 1.8vw, 16px);
+}
+
 .secret-panel {
   width: min(600px, 92vw);
   background: #121936;
@@ -636,22 +657,90 @@ button:hover {
   margin-bottom: 8px;
 }
 
+.achievements-panel {
+  max-height: min(78vh, 760px);
+  overflow: auto;
+}
+
+.achievements-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.achievement-card {
+  position: relative;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background: rgba(5, 12, 34, 0.72);
+  padding: 10px;
+  text-align: left;
+}
+
+.achievement-card h3 {
+  font-size: clamp(15px, 1.8vw, 17px);
+  margin-bottom: 6px;
+}
+
+.achievement-card p {
+  font-size: clamp(13px, 1.6vw, 15px);
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.achievement-card-status {
+  font-size: clamp(12px, 1.4vw, 14px);
+  opacity: 0.9;
+}
+
+.achievement-card.locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  pointer-events: none;
+}
+
 .hat-preview {
   position: relative;
-  width: 106px;
-  height: 76px;
+  width: 148px;
+  height: 104px;
   margin: 0 auto 8px;
 }
 
 .hat-preview-image {
   position: absolute;
   left: 50%;
-  top: 2px;
+  top: 0;
   transform: translateX(-50%);
-  width: 66px;
-  height: 52px;
+  width: 96px;
+  height: 78px;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+.hat-preview-tint {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 78px;
+  pointer-events: none;
+  background: var(--hat-tint, transparent);
+  opacity: 0;
+  mix-blend-mode: multiply;
+}
+
+.hat-preview-has-tint .hat-preview-tint {
+  opacity: 0.62;
+}
+
+.hat-preview-locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
 }
 
 .hat-preview-none {
@@ -669,54 +758,77 @@ button:hover {
 }
 
 .hat-preview-cap-main {
-  left: 23px;
-  top: 10px;
-  width: 30px;
-  height: 10px;
+  left: 30px;
+  top: 16px;
+  width: 44px;
+  height: 14px;
   background: #df5252;
 }
 
 .hat-preview-cap-brim {
-  left: 38px;
-  top: 18px;
-  width: 16px;
-  height: 4px;
+  left: 52px;
+  top: 28px;
+  width: 22px;
+  height: 6px;
   background: #b33f3f;
 }
 
 .hat-preview-crown-band {
-  left: 23px;
-  top: 13px;
-  width: 30px;
-  height: 9px;
+  left: 30px;
+  top: 20px;
+  width: 44px;
+  height: 12px;
   background: #f4ce46;
 }
 
 .hat-preview-crown-tip {
-  width: 6px;
-  height: 8px;
+  width: 9px;
+  height: 12px;
   background: #f6dd6e;
-  top: 6px;
+  top: 10px;
 }
 
-.hat-preview-crown-tip.left { left: 23px; }
-.hat-preview-crown-tip.mid { left: 35px; height: 10px; top: 4px; }
-.hat-preview-crown-tip.right { left: 47px; }
+.hat-preview-crown-tip.left { left: 30px; }
+.hat-preview-crown-tip.mid { left: 48px; height: 14px; top: 7px; }
+.hat-preview-crown-tip.right { left: 65px; }
 
 .hat-preview-wizard-cone {
-  left: 24px;
-  top: 4px;
+  left: 32px;
+  top: 8px;
   width: 0;
   height: 0;
-  border-left: 14px solid transparent;
-  border-right: 14px solid transparent;
-  border-bottom: 22px solid #7f79df;
+  border-left: 20px solid transparent;
+  border-right: 20px solid transparent;
+  border-bottom: 32px solid #7f79df;
 }
 
 .hat-preview-wizard-brim {
-  left: 20px;
-  top: 24px;
-  width: 36px;
-  height: 4px;
+  left: 26px;
+  top: 40px;
+  width: 56px;
+  height: 6px;
   background: #6a65c0;
+}
+
+.hat-color-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: clamp(13px, 1.6vw, 15px);
+}
+
+.hat-color-input {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.hat-color-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }

@@ -20,6 +20,10 @@ const warningTitle = document.getElementById('warningTitle');
 const warningMessage = document.getElementById('warningMessage');
 const warningConfirmBtn = document.getElementById('warningConfirmBtn');
 const warningCancelBtn = document.getElementById('warningCancelBtn');
+const achievementOverlay = document.getElementById('achievementOverlay');
+const achievementTitle = document.getElementById('achievementTitle');
+const achievementMessage = document.getElementById('achievementMessage');
+const achievementCloseBtn = document.getElementById('achievementCloseBtn');
 const tutorialOverlay = document.getElementById('tutorialOverlay');
 const tutorialPanel = document.getElementById('tutorialPanel');
 const tutorialStepCount = document.getElementById('tutorialStepCount');
@@ -34,11 +38,15 @@ const mobileRight = document.getElementById('mobileRight');
 const mobileDown = document.getElementById('mobileDown');
 const mobileJump = document.getElementById('mobileJump');
 const shopBtn = document.getElementById('shopBtn');
+const achievementsBtn = document.getElementById('achievementsBtn');
 const hudIntroBtn = document.getElementById('hudIntroBtn');
 const shopOverlay = document.getElementById('shopOverlay');
 const shopCoins = document.getElementById('shopCoins');
 const shopItems = document.getElementById('shopItems');
 const shopCloseBtn = document.getElementById('shopCloseBtn');
+const achievementsOverlay = document.getElementById('achievementsOverlay');
+const achievementsList = document.getElementById('achievementsList');
+const achievementsCloseBtn = document.getElementById('achievementsCloseBtn');
 const titleHeading = document.getElementById('titleHeading');
 const secretBtn = document.getElementById('secretBtn');
 const secretRainLayer = document.getElementById('secretRainLayer');
@@ -57,6 +65,7 @@ const GOAL_Y = 120;
 const GROUND_HEIGHT = 64;
 const GROUND_SINK = 34;
 const GROUND_Y = WORLD_HEIGHT - GROUND_HEIGHT + GROUND_SINK;
+const CAT_DRAW_Y_OFFSET = 2;
 
 const keys = {
   left: false,
@@ -139,6 +148,43 @@ let titleHoverTimer = null;
 let secretRainActive = false;
 let secretRainStopAt = 0;
 let secretRainDrops = [];
+const unlockedAchievements = new Set();
+const pendingAchievementQueue = [];
+const hatColorOverrides = {};
+const maskedHatSpriteCache = new Map();
+
+const achievementCatalog = {
+  first_coin: {
+    name: 'First Shiny',
+    description: 'Collect your first coin.',
+    isUnlocked: () => coinBalance >= 1,
+  },
+  coin_hoarder: {
+    name: 'Coin Hoarder',
+    description: 'Collect 25 total coins.',
+    isUnlocked: () => coinBalance >= 25,
+  },
+  first_win: {
+    name: 'Sky Breaker',
+    description: 'Reach space for the first time.',
+    isUnlocked: () => spaceWins >= 1,
+  },
+  crown_unlock: {
+    name: 'Cosmic Royalty',
+    description: 'Reach space 3 times.',
+    isUnlocked: () => spaceWins >= 3,
+  },
+  hat_collector: {
+    name: 'Catwalk Ready',
+    description: 'Buy your first hat from the shop.',
+    isUnlocked: () => unlockedHats.size > 1,
+  },
+  secret_found: {
+    name: 'Hidden Pawnel',
+    description: 'Unlock the secret panel.',
+    isUnlocked: () => secretUnlocked,
+  },
+};
 
 const tutorialSteps = [
   {
@@ -162,8 +208,8 @@ const tutorialSteps = [
     target: 'height',
   },
   {
-    title: 'Shop Button',
-    message: 'Click the shop button to buy and equip hats with coins. Some hats will need to be obtained through achievements.',
+    title: 'Hats Button',
+    message: 'Click the hats button to buy and equip hats with coins. Some hats will need to be obtained through achievements.',
     target: 'shopBtn',
   },
   {
@@ -223,26 +269,131 @@ function getSelectedHatSprite() {
   return null;
 }
 
+function getMaskedHatBaseCanvas(cacheKey, sprite, frame) {
+  if (!sprite || !frame) return null;
+  const frameKey = `${cacheKey}-${frame.sx}-${frame.sy}-${frame.sw}-${frame.sh}`;
+  if (maskedHatSpriteCache.has(frameKey)) return maskedHatSpriteCache.get(frameKey);
+
+  const canvasEl = document.createElement('canvas');
+  canvasEl.width = frame.sw;
+  canvasEl.height = frame.sh;
+  const c2d = canvasEl.getContext('2d');
+  if (!c2d) return null;
+  c2d.imageSmoothingEnabled = false;
+  c2d.drawImage(sprite, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, frame.sw, frame.sh);
+
+  const img = c2d.getImageData(0, 0, frame.sw, frame.sh);
+  const data = img.data;
+  const sw = frame.sw;
+  const sh = frame.sh;
+
+  const corner = (x, y) => {
+    const i = (y * sw + x) * 4;
+    return [data[i], data[i + 1], data[i + 2]];
+  };
+  const corners = [corner(0, 0), corner(sw - 1, 0), corner(0, sh - 1), corner(sw - 1, sh - 1)];
+  const keyR = Math.round((corners[0][0] + corners[1][0] + corners[2][0] + corners[3][0]) / 4);
+  const keyG = Math.round((corners[0][1] + corners[1][1] + corners[2][1] + corners[3][1]) / 4);
+  const keyB = Math.round((corners[0][2] + corners[1][2] + corners[2][2] + corners[3][2]) / 4);
+  const threshold = 44;
+
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const dist = Math.abs(data[i] - keyR) + Math.abs(data[i + 1] - keyG) + Math.abs(data[i + 2] - keyB);
+    if (dist <= threshold) {
+      data[i + 3] = 0;
+    }
+  }
+
+  c2d.putImageData(img, 0, 0);
+  maskedHatSpriteCache.set(frameKey, canvasEl);
+  return canvasEl;
+}
+
 function getHatPlacement(hatId) {
   if (hatId === 'cap') {
-    return { widthRatio: 0.56, heightRatio: 0.28, xOffset: 0.205, bottomYRatio: 0.21 };
+    return { widthRatio: 0.68, heightRatio: 0.34, xOffset: 0.205, bottomYRatio: 0.21 };
   }
   if (hatId === 'party') {
-    return { widthRatio: 0.58, heightRatio: 0.35, xOffset: 0.165, bottomYRatio: 0.2 };
+    return { widthRatio: 0.7, heightRatio: 0.43, xOffset: 0.165, bottomYRatio: 0.2 };
   }
   if (hatId === 'crown') {
-    return { widthRatio: 0.53, heightRatio: 0.3, xOffset: 0.135, bottomYRatio: 0.19 };
+    return { widthRatio: 0.65, heightRatio: 0.37, xOffset: 0.135, bottomYRatio: 0.19 };
   }
   if (hatId === 'wizard') {
-    return { widthRatio: 0.65, heightRatio: 0.38, xOffset: 0.135, bottomYRatio: 0.21 };
+    return { widthRatio: 0.78, heightRatio: 0.46, xOffset: 0.135, bottomYRatio: 0.21 };
   }
-  return { widthRatio: 0.6, heightRatio: 0.34, xOffset: 0.135, bottomYRatio: 0.2 };
+  return { widthRatio: 0.72, heightRatio: 0.42, xOffset: 0.135, bottomYRatio: 0.2 };
 }
 
 function syncAchievementUnlocks() {
   if (spaceWins >= 3) {
     unlockedHats.add('crown');
   }
+}
+
+function showAchievementPopup(achievementId) {
+  if (!achievementOverlay) return;
+  let title = 'Achievement Unlocked!';
+  let message = '';
+  if (typeof achievementId === 'string') {
+    const achievement = achievementCatalog[achievementId];
+    if (!achievement) return;
+    message = `${achievement.name}: ${achievement.description}`;
+  } else if (achievementId && typeof achievementId === 'object') {
+    title = achievementId.title || title;
+    message = achievementId.message || '';
+  }
+  hideWarningModal();
+  hideSecretUnlockModal();
+  if (achievementTitle) achievementTitle.textContent = title;
+  if (achievementMessage) achievementMessage.textContent = message;
+  achievementOverlay.classList.remove('hidden');
+  achievementOverlay.classList.add('active');
+}
+
+function hideAchievementPopup() {
+  if (!achievementOverlay) return;
+  achievementOverlay.classList.add('hidden');
+  achievementOverlay.classList.remove('active');
+}
+
+function unlockAchievement(achievementId, shouldNotify = true) {
+  const achievement = achievementCatalog[achievementId];
+  if (!achievement || unlockedAchievements.has(achievementId)) return false;
+  unlockedAchievements.add(achievementId);
+  renderAchievements();
+  if (shouldNotify) {
+    pendingAchievementQueue.push(achievementId);
+    if (!achievementOverlay || achievementOverlay.classList.contains('hidden')) {
+      const nextId = pendingAchievementQueue.shift();
+      if (nextId) showAchievementPopup(nextId);
+    }
+  }
+  return true;
+}
+
+function unlockAchievementsByState(shouldNotify = true) {
+  Object.keys(achievementCatalog).forEach((achievementId) => {
+    const achievement = achievementCatalog[achievementId];
+    if (achievement && achievement.isUnlocked()) {
+      unlockAchievement(achievementId, shouldNotify);
+    }
+  });
+}
+
+function queueHatPopup(title, message) {
+  pendingAchievementQueue.push({ title, message });
+  if (!achievementOverlay || achievementOverlay.classList.contains('hidden')) {
+    const nextId = pendingAchievementQueue.shift();
+    if (nextId) showAchievementPopup(nextId);
+  }
+}
+
+function showNextAchievementPopup() {
+  if (pendingAchievementQueue.length === 0) return;
+  const nextId = pendingAchievementQueue.shift();
+  if (nextId) showAchievementPopup(nextId);
 }
 
 function showSecretUnlockModal() {
@@ -355,6 +506,7 @@ function unlockSecretPanel() {
   updateSecretButtonVisibility();
   startSecretRain();
   showSecretUnlockModal();
+  unlockAchievementsByState(true);
 }
 
 function beginTitleHoverTimer() {
@@ -387,6 +539,7 @@ function applyPixelRenderSettings() {
 }
 
 function showWarningModal(title, message, onConfirm) {
+  closeAchievements();
   closeShop();
   warningAction = onConfirm;
   if (warningTitle) warningTitle.textContent = title;
@@ -535,9 +688,10 @@ function updateCoinsHUD() {
   if (shopCoins) shopCoins.textContent = `Coins: ${coinBalance}`;
 }
 
-function createHatPreview(hatId) {
+function createHatPreview(hatId, tintColor = null, isLocked = false) {
   const preview = document.createElement('div');
   preview.className = 'hat-preview';
+  if (isLocked) preview.classList.add('hat-preview-locked');
 
   if (hatId === 'none') {
     const none = document.createElement('div');
@@ -554,7 +708,15 @@ function createHatPreview(hatId) {
     img.alt = `${hatId} hat`;
     img.src = encodeAssetPath(spritePath);
     preview.appendChild(img);
+    const tint = document.createElement('div');
+    tint.className = 'hat-preview-tint';
+    preview.appendChild(tint);
     return preview;
+  }
+
+  if (tintColor && hatId !== 'none') {
+    preview.style.setProperty('--hat-tint', tintColor);
+    preview.classList.add('hat-preview-has-tint');
   }
 
   if (hatId === 'cap') {
@@ -590,7 +752,13 @@ function renderShop() {
     const card = document.createElement('div');
     card.className = 'shop-item';
 
-    card.appendChild(createHatPreview(hat.id));
+    const achievementLocked = hat.unlockType === 'spaceWins' && spaceWins < (hat.requiredWins || 0);
+    const owned = unlockedHats.has(hat.id);
+    const selected = selectedHat === hat.id;
+    const hatTintColor = hatColorOverrides[hat.id] || hat.color || '#ffffff';
+    const previewLocked = hat.id !== 'none' && (!owned || achievementLocked);
+
+    card.appendChild(createHatPreview(hat.id, hatTintColor, previewLocked));
 
     const title = document.createElement('h3');
     title.textContent = hat.label;
@@ -599,18 +767,16 @@ function renderShop() {
     const price = document.createElement('p');
     if (hat.unlockType === 'spaceWins') {
       const winsLeft = Math.max(0, (hat.requiredWins || 0) - spaceWins);
+      const unlockAchievementName = hat.id === 'crown' ? achievementCatalog.crown_unlock.name : 'Achievement';
       price.textContent = winsLeft === 0
-        ? `Achievement unlocked (${spaceWins}/${hat.requiredWins})`
-        : `Reach Space ${hat.requiredWins}x (${spaceWins}/${hat.requiredWins})`;
+        ? `${unlockAchievementName} unlocked (${spaceWins}/${hat.requiredWins})`
+        : `${unlockAchievementName}: Reach Space ${hat.requiredWins}x (${spaceWins}/${hat.requiredWins})`;
     } else {
       price.textContent = hat.cost === 0 ? 'Free' : `${hat.cost} coins`;
     }
     card.appendChild(price);
 
     const btn = document.createElement('button');
-    const achievementLocked = hat.unlockType === 'spaceWins' && spaceWins < (hat.requiredWins || 0);
-    const owned = unlockedHats.has(hat.id);
-    const selected = selectedHat === hat.id;
     if (achievementLocked) {
       btn.textContent = 'Locked';
       btn.disabled = true;
@@ -628,6 +794,8 @@ function renderShop() {
       if (!hasHat) {
         coinBalance -= hat.cost;
         unlockedHats.add(hat.id);
+        queueHatPopup('Hat Bought', 'Hat can be equipped.');
+        unlockAchievementsByState(true);
       }
       selectedHat = hat.id;
       updateCoinsHUD();
@@ -635,13 +803,86 @@ function renderShop() {
     });
     card.appendChild(btn);
 
+    if (hat.id !== 'none') {
+      const colorWrap = document.createElement('label');
+      colorWrap.className = 'hat-color-wrap';
+      colorWrap.textContent = 'Color';
+
+      const colorInput = document.createElement('input');
+      colorInput.className = 'hat-color-input';
+      colorInput.type = 'color';
+      colorInput.value = hatTintColor;
+      colorInput.disabled = !owned || achievementLocked;
+      colorInput.title = owned ? 'Choose hat color' : 'Buy or unlock this hat first';
+      colorInput.addEventListener('input', () => {
+        hatColorOverrides[hat.id] = colorInput.value;
+        renderShop();
+      });
+
+      colorWrap.appendChild(colorInput);
+      card.appendChild(colorWrap);
+    }
+
     shopItems.appendChild(card);
   });
+}
+
+function getAchievementCardStatus(id, achievement) {
+  if (id === 'first_coin') return `${Math.min(coinBalance, 1)}/1`;
+  if (id === 'coin_hoarder') return `${Math.min(coinBalance, 25)}/25`;
+  if (id === 'first_win') return `${Math.min(spaceWins, 1)}/1`;
+  if (id === 'crown_unlock') return `${Math.min(spaceWins, 3)}/3`;
+  if (id === 'hat_collector') return unlockedHats.size > 1 ? 'Done' : '0/1';
+  if (id === 'secret_found') return secretUnlocked ? 'Done' : 'Locked';
+  return achievement && unlockedAchievements.has(id) ? 'Done' : 'Locked';
+}
+
+function renderAchievements() {
+  if (!achievementsList) return;
+  achievementsList.innerHTML = '';
+  Object.entries(achievementCatalog).forEach(([id, achievement]) => {
+    const unlocked = unlockedAchievements.has(id);
+    const card = document.createElement('div');
+    card.className = `achievement-card${unlocked ? '' : ' locked'}`;
+
+    const title = document.createElement('h3');
+    title.textContent = achievement.name;
+    card.appendChild(title);
+
+    const desc = document.createElement('p');
+    desc.textContent = achievement.description;
+    card.appendChild(desc);
+
+    const status = document.createElement('div');
+    status.className = 'achievement-card-status';
+    status.textContent = unlocked
+      ? 'Unlocked'
+      : `Progress: ${getAchievementCardStatus(id, achievement)}`;
+    card.appendChild(status);
+
+    achievementsList.appendChild(card);
+  });
+}
+
+function openAchievements() {
+  if (!achievementsOverlay) return;
+  hideWarningModal();
+  closeShop();
+  renderAchievements();
+  achievementsOverlay.classList.remove('hidden');
+  achievementsOverlay.classList.add('active');
+}
+
+function closeAchievements() {
+  if (!achievementsOverlay) return;
+  achievementsOverlay.classList.add('hidden');
+  achievementsOverlay.classList.remove('active');
 }
 
 function openShop() {
   if (!shopOverlay) return;
   hideWarningModal();
+  closeAchievements();
   renderShop();
   updateCoinsHUD();
   shopOverlay.classList.remove('hidden');
@@ -656,16 +897,23 @@ function closeShop() {
 
 function drawHatAt(x, y, w, h) {
   if (selectedHat === 'none') return;
+  const hatTintColor = hatColorOverrides[selectedHat] || null;
 
   const hatSprite = getSelectedHatSprite();
   if (hatSprite) {
     const frame = getSpriteFrame(hatSprite);
+    const maskedBase = getMaskedHatBaseCanvas(`hat-${selectedHat}`, hatSprite, frame);
+    const source = maskedBase || hatSprite;
+    const sourceSx = maskedBase ? 0 : frame.sx;
+    const sourceSy = maskedBase ? 0 : frame.sy;
+    const sourceSw = maskedBase ? maskedBase.width : frame.sw;
+    const sourceSh = maskedBase ? maskedBase.height : frame.sh;
     const placement = getHatPlacement(selectedHat);
     const maxW = Math.round(w * placement.widthRatio);
     const maxH = Math.round(h * placement.heightRatio);
-    const scale = Math.min(maxW / frame.sw, maxH / frame.sh);
-    const drawW = Math.max(8, Math.round(frame.sw * scale));
-    const drawH = Math.max(8, Math.round(frame.sh * scale));
+    const scale = Math.min(maxW / sourceSw, maxH / sourceSh);
+    const drawW = Math.max(8, Math.round(sourceSw * scale));
+    const drawH = Math.max(8, Math.round(sourceSh * scale));
     // Keep hats attached to the head side by making horizontal offset follow facing direction.
     const facingOffset = (player.facingRight ? 1 : -1) * (w * placement.xOffset);
     let drawX = Math.round(x + (w - drawW) / 2 + facingOffset);
@@ -683,11 +931,25 @@ function drawHatAt(x, y, w, h) {
     const drawFacingRight = selectedHat === 'cap' ? shouldFaceRight : shouldFaceRight;
     ctx.save();
     if (drawFacingRight) {
-      ctx.drawImage(hatSprite, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
+      ctx.drawImage(source, sourceSx, sourceSy, sourceSw, sourceSh, drawX, drawY, drawW, drawH);
+      if (hatTintColor) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = 0.62;
+        ctx.fillStyle = hatTintColor;
+        ctx.fillRect(drawX, drawY, drawW, drawH);
+        ctx.globalAlpha = 1;
+      }
     } else {
       ctx.translate(drawX + drawW, drawY);
       ctx.scale(-1, 1);
-      ctx.drawImage(hatSprite, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, drawW, drawH);
+      ctx.drawImage(source, sourceSx, sourceSy, sourceSw, sourceSh, 0, 0, drawW, drawH);
+      if (hatTintColor) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = 0.62;
+        ctx.fillStyle = hatTintColor;
+        ctx.fillRect(0, 0, drawW, drawH);
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.restore();
     return;
@@ -886,6 +1148,9 @@ function saveProgress() {
     spaceWins,
     selectedHat,
     unlockedHats: Array.from(unlockedHats),
+    hatColorOverrides: { ...hatColorOverrides },
+    unlockedAchievements: Array.from(unlockedAchievements),
+    secretUnlocked,
     cameraY,
     dropStartY,
     player: {
@@ -906,13 +1171,26 @@ function saveProgress() {
 
 function restoreProgress() {
   if (!savedProgress) return false;
+  const hadSecretUnlockedAlready = secretUnlocked;
   lives = savedProgress.lives;
   coinBalance = savedProgress.coinBalance || 0;
   spaceWins = savedProgress.spaceWins || 0;
   selectedHat = savedProgress.selectedHat || 'none';
+  // Keep a title-screen unlock that happened after the last save.
+  secretUnlocked = !!savedProgress.secretUnlocked || hadSecretUnlockedAlready;
   unlockedHats.clear();
   (savedProgress.unlockedHats || ['none']).forEach((h) => unlockedHats.add(h));
+  Object.keys(hatColorOverrides).forEach((k) => {
+    delete hatColorOverrides[k];
+  });
+  const restoredHatColors = savedProgress.hatColorOverrides || {};
+  Object.keys(restoredHatColors).forEach((k) => {
+    hatColorOverrides[k] = restoredHatColors[k];
+  });
+  unlockedAchievements.clear();
+  (savedProgress.unlockedAchievements || []).forEach((id) => unlockedAchievements.add(id));
   syncAchievementUnlocks();
+  unlockAchievementsByState(false);
   ensureSelectedHatIsUnlocked();
   cameraY = savedProgress.cameraY;
   dropStartY = savedProgress.dropStartY;
@@ -935,6 +1213,7 @@ function restoreProgress() {
   hud.classList.remove('hidden');
   showScreen('none');
   updateHUD();
+  renderAchievements();
   return true;
 }
 
@@ -947,6 +1226,13 @@ function resetGame(keepProgress = false) {
     selectedHat = 'none';
     unlockedHats.clear();
     unlockedHats.add('none');
+    unlockedAchievements.clear();
+    if (secretUnlocked) {
+      unlockedAchievements.add('secret_found');
+    }
+    Object.keys(hatColorOverrides).forEach((k) => {
+      delete hatColorOverrides[k];
+    });
   }
   syncAchievementUnlocks();
   savedProgress = null;
@@ -967,8 +1253,10 @@ function resetGame(keepProgress = false) {
   createPlatforms();
   createStars();
   closeShop();
+  closeAchievements();
   hud.classList.remove('hidden');
   updateHUD();
+  renderAchievements();
   // force an immediate draw so sprites load and positioning updates
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
   drawBackground();
@@ -1349,6 +1637,7 @@ function winGame() {
   endGuidedTutorial();
   spaceWins += 1;
   syncAchievementUnlocks();
+  unlockAchievementsByState(true);
   gameState = 'win';
   spawnConfetti();
   showScreen('win');
@@ -1608,7 +1897,7 @@ function drawCat() {
     const drawW = Math.round(frame.sw * scale);
     const drawH = Math.round(frame.sh * scale);
     const drawX = Math.round(player.x + (player.width - drawW) / 2);
-    const drawY = Math.round((player.y + player.height) - drawH - cameraY);
+    const drawY = Math.round((player.y + player.height) - drawH - cameraY + CAT_DRAW_Y_OFFSET);
     ctx.save();
     if (!player.facingRight) {
       ctx.translate(drawX + drawW, drawY);
@@ -1809,6 +2098,7 @@ function applyPhysics() {
       spawnCoinBurst(coin.x, coin.y);
       playCoinSfx();
       updateCoinsHUD();
+      unlockAchievementsByState(true);
     }
   });
 
@@ -1854,7 +2144,7 @@ function applyPhysics() {
   // calculate sprite height using same scale as drawCat()
   const spriteH = Math.round(player.height * 1.45);
   // drawY used in drawCat = player.y - cameraY - (spriteH - player.height)
-  let drawY = player.y - cameraY - (spriteH - player.height);
+  let drawY = player.y - cameraY - (spriteH - player.height) + CAT_DRAW_Y_OFFSET;
   const margin = 8;
   if (drawY < margin) {
     cameraY -= (margin - drawY);
@@ -2015,6 +2305,13 @@ if (shopBtn) {
   });
 }
 
+if (achievementsBtn) {
+  achievementsBtn.addEventListener('click', () => {
+    if (tutorialActive) return;
+    openAchievements();
+  });
+}
+
 if (hudIntroBtn) {
   hudIntroBtn.addEventListener('click', () => {
     if (tutorialActive) return;
@@ -2025,6 +2322,12 @@ if (hudIntroBtn) {
 if (shopCloseBtn) {
   shopCloseBtn.addEventListener('click', () => {
     closeShop();
+  });
+}
+
+if (achievementsCloseBtn) {
+  achievementsCloseBtn.addEventListener('click', () => {
+    closeAchievements();
   });
 }
 
@@ -2046,6 +2349,13 @@ if (deathQuitBtn) {
 if (secretUnlockBtn) {
   secretUnlockBtn.addEventListener('click', () => {
     hideSecretUnlockModal();
+  });
+}
+
+if (achievementCloseBtn) {
+  achievementCloseBtn.addEventListener('click', () => {
+    hideAchievementPopup();
+    showNextAchievementPopup();
   });
 }
 
@@ -2091,6 +2401,11 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
     return;
   }
+  if (achievementsOverlay && !achievementsOverlay.classList.contains('hidden')) {
+    if (event.code === 'Escape') closeAchievements();
+    event.preventDefault();
+    return;
+  }
   if (warningOverlay && !warningOverlay.classList.contains('hidden')) {
     if (event.code === 'Escape') hideWarningModal();
     event.preventDefault();
@@ -2098,6 +2413,14 @@ window.addEventListener('keydown', (event) => {
   }
   if (secretUnlockOverlay && !secretUnlockOverlay.classList.contains('hidden')) {
     if (event.code === 'Escape') hideSecretUnlockModal();
+    event.preventDefault();
+    return;
+  }
+  if (achievementOverlay && !achievementOverlay.classList.contains('hidden')) {
+    if (event.code === 'Escape') {
+      hideAchievementPopup();
+      showNextAchievementPopup();
+    }
     event.preventDefault();
     return;
   }
@@ -2229,6 +2552,8 @@ window.addEventListener('resize', () => {
 loadAssets().finally(() => {
   createPlatforms();
   drawLives();
+  unlockAchievementsByState(false);
+  renderAchievements();
 });
 
 if (titleHeading) {

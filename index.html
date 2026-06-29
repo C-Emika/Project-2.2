@@ -28,7 +28,7 @@
           <li>Ensure your lives last to reach your goal.</li>
           <li>Collect coins from platforms during your climb.</li>
           <li>Track your progress in meters. Your goal is at 1000 meters.</li>
-          <li>Click the shop button to buy and equip hats with coins. Some hats will need to be obtained through achievements.</li>
+          <li>Click the hats button to buy and equip hats with coins. Some hats will need to be obtained through achievements.</li>
           <li>Click the reset button to reset your progress and start from the beginning.</li>
           <li>Click the quit button to save your current progress and return to the title.</li>
         </ul>
@@ -64,7 +64,8 @@
       <div id="goal">Goal: Space</div>
     </div>
     <div id="hudRight">
-      <button id="shopBtn" class="hud-button">Shop</button>
+      <button id="shopBtn" class="hud-button">Hats</button>
+      <button id="achievementsBtn" class="hud-button">Achievements</button>
       <button id="hudIntroBtn" class="hud-button">Intro</button>
       <button id="resetBtn" class="hud-button">Reset</button>
       <button id="quitBtn" class="hud-button">Quit</button>
@@ -73,10 +74,18 @@
 
   <div id="shopOverlay" class="overlay hidden">
     <div class="shop-panel">
-      <h2>Hat Shop</h2>
+      <h2>Hats</h2>
       <p id="shopCoins">Coins: 0</p>
       <div id="shopItems" class="shop-items"></div>
       <button id="shopCloseBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="achievementsOverlay" class="overlay hidden">
+    <div class="shop-panel achievements-panel">
+      <h2>Achievements</h2>
+      <div id="achievementsList" class="achievements-list"></div>
+      <button id="achievementsCloseBtn">Close</button>
     </div>
   </div>
 
@@ -87,6 +96,16 @@
       <div class="button-row warning-actions">
         <button id="warningConfirmBtn">Confirm</button>
         <button id="warningCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="achievementOverlay" class="overlay warning-overlay hidden">
+    <div class="achievement-panel">
+      <h2 id="achievementTitle">Achievement Complete!</h2>
+      <p id="achievementMessage"></p>
+      <div class="button-row warning-actions">
+        <button id="achievementCloseBtn">Awesome</button>
       </div>
     </div>
   </div>
@@ -102,7 +121,7 @@
   <div id="secretPanelOverlay" class="overlay warning-overlay hidden">
     <div class="secret-panel">
       <h2>Secret Panel</h2>
-      <p>Enter your prefered amount of coins. (0-1,000,000)</p>
+      <p>Enter your preferred amount of coins. (0-1,000,000)</p>
       <input id="secretCoinInput" class="secret-input" type="number" min="0" max="1000000" step="1" inputmode="numeric" placeholder="0-1000000" />
       <p id="secretPanelError" class="secret-error" aria-live="polite"></p>
       <div class="button-row warning-actions">
@@ -132,7 +151,7 @@
     <button id="mobileJump" class="mobile-control-btn mobile-up" aria-label="Jump"></button>
   </div>
 
-  <button id="secretBtn" class="hud-button hidden">Secret Panel</button>
+  <button id="secretBtn" class="hud-button hidden">Secret Pawnel</button>
 
   <script src="script.js"></script>
 </body>
