@@ -813,18 +813,24 @@ button:hover {
 .hat-color-wrap {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  margin-top: 6px;
+  margin: 8px 0 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background: rgba(8, 14, 36, 0.78);
+  border-radius: 2px;
   font-size: clamp(13px, 1.6vw, 15px);
 }
 
 .hat-color-input {
-  width: 34px;
-  height: 26px;
+  width: 44px;
+  height: 30px;
   padding: 0;
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   border-radius: 2px;
-  background: transparent;
+  background: #111a3a;
   cursor: pointer;
 }
 

@@ -152,6 +152,8 @@ const unlockedAchievements = new Set();
 const pendingAchievementQueue = [];
 const hatColorOverrides = {};
 const maskedHatSpriteCache = new Map();
+const grayscaleHatSpriteCache = new Map();
+const tintedHatSpriteCache = new Map();
 
 const achievementCatalog = {
   first_coin: {
@@ -164,6 +166,11 @@ const achievementCatalog = {
     description: 'Collect 25 total coins.',
     isUnlocked: () => coinBalance >= 25,
   },
+  coin_centurion: {
+    name: 'Coin Centurion',
+    description: 'Collect 100 total coins.',
+    isUnlocked: () => coinBalance >= 100,
+  },
   first_win: {
     name: 'Sky Breaker',
     description: 'Reach space for the first time.',
@@ -171,13 +178,23 @@ const achievementCatalog = {
   },
   crown_unlock: {
     name: 'Cosmic Royalty',
-    description: 'Reach space 3 times.',
-    isUnlocked: () => spaceWins >= 3,
+    description: 'Reach space 10 times and unlock the Crown hat.',
+    isUnlocked: () => spaceWins >= 10,
   },
   hat_collector: {
     name: 'Catwalk Ready',
     description: 'Buy your first hat from the shop.',
     isUnlocked: () => unlockedHats.size > 1,
+  },
+  hat_trio: {
+    name: 'Hat Trick',
+    description: 'Buy or earn 3 hats.',
+    isUnlocked: () => Array.from(unlockedHats).filter((h) => h !== 'none').length >= 3,
+  },
+  hat_master: {
+    name: 'Full Closet',
+    description: 'Buy or earn all hats.',
+    isUnlocked: () => Array.from(unlockedHats).filter((h) => h !== 'none').length >= 4,
   },
   secret_found: {
     name: 'Hidden Pawnel',
@@ -237,10 +254,10 @@ const tutorialSteps = [
 
 const hatCatalog = [
   { id: 'none', label: 'No Hat', cost: 0, color: '#ffffff' },
-  { id: 'cap', label: 'Red Cap', cost: 12, color: '#df5252' },
-  { id: 'party', label: 'Party Hat', cost: 18, color: '#f48252' },
-  { id: 'crown', label: 'Crown', cost: 0, color: '#f4ce46', unlockType: 'spaceWins', requiredWins: 3 },
-  { id: 'wizard', label: 'Wizard Hat', cost: 40, color: '#7f79df' },
+  { id: 'cap', label: 'Red Cap', cost: 10, color: '#df5252' },
+  { id: 'party', label: 'Party Hat', cost: 15, color: '#f48252' },
+  { id: 'crown', label: 'Crown', cost: 0, color: '#f4ce46', unlockType: 'spaceWins', requiredWins: 10 },
+  { id: 'wizard', label: 'Wizard Hat', cost: 30, color: '#7f79df' },
 ];
 
 const spriteFilePaths = {
@@ -295,18 +312,110 @@ function getMaskedHatBaseCanvas(cacheKey, sprite, frame) {
   const keyR = Math.round((corners[0][0] + corners[1][0] + corners[2][0] + corners[3][0]) / 4);
   const keyG = Math.round((corners[0][1] + corners[1][1] + corners[2][1] + corners[3][1]) / 4);
   const keyB = Math.round((corners[0][2] + corners[1][2] + corners[2][2] + corners[3][2]) / 4);
-  const threshold = 44;
+  const threshold = 54;
+  const isBgPixel = (idx) => {
+    if (data[idx + 3] === 0) return true;
+    const dist = Math.abs(data[idx] - keyR) + Math.abs(data[idx + 1] - keyG) + Math.abs(data[idx + 2] - keyB);
+    return dist <= threshold;
+  };
 
-  for (let i = 0; i < data.length; i += 4) {
-    if (data[i + 3] === 0) continue;
-    const dist = Math.abs(data[i] - keyR) + Math.abs(data[i + 1] - keyG) + Math.abs(data[i + 2] - keyB);
-    if (dist <= threshold) {
-      data[i + 3] = 0;
-    }
+  // Remove only edge-connected chroma-key background so hat shading remains intact.
+  const visited = new Uint8Array(sw * sh);
+  const qx = new Int16Array(sw * sh);
+  const qy = new Int16Array(sw * sh);
+  let head = 0;
+  let tail = 0;
+  const enqueue = (x, y) => {
+    const p = y * sw + x;
+    if (visited[p]) return;
+    const idx = p * 4;
+    if (!isBgPixel(idx)) return;
+    visited[p] = 1;
+    qx[tail] = x;
+    qy[tail] = y;
+    tail += 1;
+  };
+
+  for (let x = 0; x < sw; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, sh - 1);
+  }
+  for (let y = 0; y < sh; y += 1) {
+    enqueue(0, y);
+    enqueue(sw - 1, y);
+  }
+
+  while (head < tail) {
+    const x = qx[head];
+    const y = qy[head];
+    head += 1;
+    const p = y * sw + x;
+    const idx = p * 4;
+    data[idx + 3] = 0;
+    if (x > 0) enqueue(x - 1, y);
+    if (x < sw - 1) enqueue(x + 1, y);
+    if (y > 0) enqueue(x, y - 1);
+    if (y < sh - 1) enqueue(x, y + 1);
   }
 
   c2d.putImageData(img, 0, 0);
   maskedHatSpriteCache.set(frameKey, canvasEl);
+  return canvasEl;
+}
+
+function getTintedHatCanvas(cacheKey, maskedBase, tintColor) {
+  if (!maskedBase || !tintColor) return maskedBase;
+  const grayBase = getGrayscaleHatCanvas(cacheKey, maskedBase);
+  if (!grayBase) return maskedBase;
+  const tintKey = `${cacheKey}-${grayBase.width}x${grayBase.height}-${tintColor}`;
+  if (tintedHatSpriteCache.has(tintKey)) return tintedHatSpriteCache.get(tintKey);
+
+  const canvasEl = document.createElement('canvas');
+  canvasEl.width = grayBase.width;
+  canvasEl.height = grayBase.height;
+  const c2d = canvasEl.getContext('2d');
+  if (!c2d) return maskedBase;
+  c2d.imageSmoothingEnabled = false;
+  c2d.drawImage(grayBase, 0, 0);
+  c2d.globalCompositeOperation = 'multiply';
+  c2d.globalAlpha = 1;
+  c2d.fillStyle = tintColor;
+  c2d.fillRect(0, 0, canvasEl.width, canvasEl.height);
+
+  // Keep the exact hat silhouette alpha after colorization.
+  c2d.globalCompositeOperation = 'destination-in';
+  c2d.drawImage(grayBase, 0, 0);
+
+  c2d.globalCompositeOperation = 'source-over';
+  tintedHatSpriteCache.set(tintKey, canvasEl);
+  return canvasEl;
+}
+
+function getGrayscaleHatCanvas(cacheKey, maskedBase) {
+  if (!maskedBase) return null;
+  const grayKey = `${cacheKey}-${maskedBase.width}x${maskedBase.height}`;
+  if (grayscaleHatSpriteCache.has(grayKey)) return grayscaleHatSpriteCache.get(grayKey);
+
+  const canvasEl = document.createElement('canvas');
+  canvasEl.width = maskedBase.width;
+  canvasEl.height = maskedBase.height;
+  const c2d = canvasEl.getContext('2d');
+  if (!c2d) return null;
+  c2d.imageSmoothingEnabled = false;
+  c2d.drawImage(maskedBase, 0, 0);
+
+  const img = c2d.getImageData(0, 0, canvasEl.width, canvasEl.height);
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const lum = Math.round((data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114));
+    const lifted = Math.min(255, Math.round(lum * 0.6 + 90));
+    data[i] = lifted;
+    data[i + 1] = lifted;
+    data[i + 2] = lifted;
+  }
+  c2d.putImageData(img, 0, 0);
+  grayscaleHatSpriteCache.set(grayKey, canvasEl);
   return canvasEl;
 }
 
@@ -327,8 +436,11 @@ function getHatPlacement(hatId) {
 }
 
 function syncAchievementUnlocks() {
-  if (spaceWins >= 3) {
+  if (spaceWins >= 10) {
     unlockedHats.add('crown');
+  } else {
+    unlockedHats.delete('crown');
+    if (selectedHat === 'crown') selectedHat = 'none';
   }
 }
 
@@ -758,7 +870,8 @@ function renderShop() {
     const hatTintColor = hatColorOverrides[hat.id] || hat.color || '#ffffff';
     const previewLocked = hat.id !== 'none' && (!owned || achievementLocked);
 
-    card.appendChild(createHatPreview(hat.id, hatTintColor, previewLocked));
+    const previewEl = createHatPreview(hat.id, hatTintColor, previewLocked);
+    card.appendChild(previewEl);
 
     const title = document.createElement('h3');
     title.textContent = hat.label;
@@ -775,6 +888,27 @@ function renderShop() {
       price.textContent = hat.cost === 0 ? 'Free' : `${hat.cost} coins`;
     }
     card.appendChild(price);
+
+    if (hat.id !== 'none') {
+      const colorWrap = document.createElement('label');
+      colorWrap.className = 'hat-color-wrap';
+      colorWrap.textContent = 'Color';
+
+      const colorInput = document.createElement('input');
+      colorInput.className = 'hat-color-input';
+      colorInput.type = 'color';
+      colorInput.value = hatTintColor;
+      colorInput.disabled = !owned || achievementLocked;
+      colorInput.title = owned ? 'Choose hat color' : 'Buy or unlock this hat first';
+      colorInput.addEventListener('input', () => {
+        hatColorOverrides[hat.id] = colorInput.value;
+        previewEl.style.setProperty('--hat-tint', colorInput.value);
+        previewEl.classList.add('hat-preview-has-tint');
+      });
+
+      colorWrap.appendChild(colorInput);
+      card.appendChild(colorWrap);
+    }
 
     const btn = document.createElement('button');
     if (achievementLocked) {
@@ -803,26 +937,6 @@ function renderShop() {
     });
     card.appendChild(btn);
 
-    if (hat.id !== 'none') {
-      const colorWrap = document.createElement('label');
-      colorWrap.className = 'hat-color-wrap';
-      colorWrap.textContent = 'Color';
-
-      const colorInput = document.createElement('input');
-      colorInput.className = 'hat-color-input';
-      colorInput.type = 'color';
-      colorInput.value = hatTintColor;
-      colorInput.disabled = !owned || achievementLocked;
-      colorInput.title = owned ? 'Choose hat color' : 'Buy or unlock this hat first';
-      colorInput.addEventListener('input', () => {
-        hatColorOverrides[hat.id] = colorInput.value;
-        renderShop();
-      });
-
-      colorWrap.appendChild(colorInput);
-      card.appendChild(colorWrap);
-    }
-
     shopItems.appendChild(card);
   });
 }
@@ -830,9 +944,12 @@ function renderShop() {
 function getAchievementCardStatus(id, achievement) {
   if (id === 'first_coin') return `${Math.min(coinBalance, 1)}/1`;
   if (id === 'coin_hoarder') return `${Math.min(coinBalance, 25)}/25`;
+  if (id === 'coin_centurion') return `${Math.min(coinBalance, 100)}/100`;
   if (id === 'first_win') return `${Math.min(spaceWins, 1)}/1`;
-  if (id === 'crown_unlock') return `${Math.min(spaceWins, 3)}/3`;
-  if (id === 'hat_collector') return unlockedHats.size > 1 ? 'Done' : '0/1';
+  if (id === 'crown_unlock') return `${Math.min(spaceWins, 10)}/10`;
+  if (id === 'hat_collector') return Array.from(unlockedHats).filter((h) => h !== 'none').length >= 1 ? 'Done' : '0/1';
+  if (id === 'hat_trio') return `${Math.min(Array.from(unlockedHats).filter((h) => h !== 'none').length, 3)}/3`;
+  if (id === 'hat_master') return `${Math.min(Array.from(unlockedHats).filter((h) => h !== 'none').length, 4)}/4`;
   if (id === 'secret_found') return secretUnlocked ? 'Done' : 'Locked';
   return achievement && unlockedAchievements.has(id) ? 'Done' : 'Locked';
 }
@@ -903,11 +1020,12 @@ function drawHatAt(x, y, w, h) {
   if (hatSprite) {
     const frame = getSpriteFrame(hatSprite);
     const maskedBase = getMaskedHatBaseCanvas(`hat-${selectedHat}`, hatSprite, frame);
-    const source = maskedBase || hatSprite;
+    const tintedSource = hatTintColor ? getTintedHatCanvas(`hat-${selectedHat}`, maskedBase, hatTintColor) : null;
+    const source = tintedSource || maskedBase || hatSprite;
     const sourceSx = maskedBase ? 0 : frame.sx;
     const sourceSy = maskedBase ? 0 : frame.sy;
-    const sourceSw = maskedBase ? maskedBase.width : frame.sw;
-    const sourceSh = maskedBase ? maskedBase.height : frame.sh;
+    const sourceSw = (maskedBase || tintedSource) ? source.width : frame.sw;
+    const sourceSh = (maskedBase || tintedSource) ? source.height : frame.sh;
     const placement = getHatPlacement(selectedHat);
     const maxW = Math.round(w * placement.widthRatio);
     const maxH = Math.round(h * placement.heightRatio);
@@ -919,11 +1037,11 @@ function drawHatAt(x, y, w, h) {
     let drawX = Math.round(x + (w - drawW) / 2 + facingOffset);
     const spritePixelScale = drawW / frame.sw;
     if (selectedHat === 'cap') {
-      // Move cap further left by 4 sprite pixels for a clearly visible shift.
-      drawX -= Math.round(spritePixelScale * 4);
+      // Move cap further left for better head alignment.
+      drawX -= Math.round(spritePixelScale * 12);
     } else if (selectedHat === 'crown') {
-      // Nudge crown right by 1 sprite pixel.
-      drawX += Math.round(spritePixelScale * 1);
+      // Nudge crown right slightly.
+      drawX += Math.round(spritePixelScale * 3);
     }
     const drawY = Math.round(y + (h * placement.bottomYRatio) - drawH);
     const shouldFaceRight = player.facingRight;
@@ -932,7 +1050,7 @@ function drawHatAt(x, y, w, h) {
     ctx.save();
     if (drawFacingRight) {
       ctx.drawImage(source, sourceSx, sourceSy, sourceSw, sourceSh, drawX, drawY, drawW, drawH);
-      if (hatTintColor) {
+      if (hatTintColor && !tintedSource) {
         ctx.globalCompositeOperation = 'source-atop';
         ctx.globalAlpha = 0.62;
         ctx.fillStyle = hatTintColor;
@@ -943,7 +1061,7 @@ function drawHatAt(x, y, w, h) {
       ctx.translate(drawX + drawW, drawY);
       ctx.scale(-1, 1);
       ctx.drawImage(source, sourceSx, sourceSy, sourceSw, sourceSh, 0, 0, drawW, drawH);
-      if (hatTintColor) {
+      if (hatTintColor && !tintedSource) {
         ctx.globalCompositeOperation = 'source-atop';
         ctx.globalAlpha = 0.62;
         ctx.fillStyle = hatTintColor;
@@ -1472,11 +1590,13 @@ function createStars() {
 }
 
 function loadAssets(basePath = 'assets') {
+  const ASSET_REV = '2026-06-29-icy-refresh';
+  const withAssetRev = (src) => `${encodeAssetPath(src)}${src.includes('?') ? '&' : '?'}v=${ASSET_REV}`;
   const load = (src) => new Promise((res) => {
     const img = new Image();
     img.onload = () => res(img);
     img.onerror = () => res(null);
-    img.src = encodeAssetPath(src);
+    img.src = withAssetRev(src);
   });
 
   const loadFirst = (names) => names.reduce(
@@ -1523,6 +1643,8 @@ function loadAssets(basePath = 'assets') {
       `${basePath}/Vibe Coding Assets (3) #8 Small Grass Platform.png`,
     ]).then((i) => (assets.grassSmall = i)),
     loadFirstPaths([
+      'Vibe Coding Assets (3) #12 Icy Small Grass Platform New.png',
+      `${basePath}/Vibe Coding Assets (3) #12 Icy Small Grass Platform New.png`,
       'Vibe Coding Assets (3) #12 Icy Small Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #12 Icy Small Grass Platform.png`,
     ]).then((i) => (assets.iceGrassSmall = i)),
@@ -1532,6 +1654,8 @@ function loadAssets(basePath = 'assets') {
       `${basePath}/Vibe Coding Assets (3) #10 Large Grass Platform.png`,
     ]).then((i) => (assets.grassMedium = i)),
     loadFirstPaths([
+      'Vibe Coding Assets (3) #13 Icy Medium Grass Platform New.png',
+      `${basePath}/Vibe Coding Assets (3) #13 Icy Medium Grass Platform New.png`,
       'Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png`,
     ]).then((i) => (assets.iceGrassMedium = i)),
@@ -1543,6 +1667,8 @@ function loadAssets(basePath = 'assets') {
       `${basePath}/Vibe Coding Assets (3) #9 Medium Grass Platform.png`,
     ]).then((i) => (assets.grassLarge = i)),
     loadFirstPaths([
+      'Vibe Coding Assets (3) #14 Icy Large Grass Platform New.png',
+      `${basePath}/Vibe Coding Assets (3) #14 Icy Large Grass Platform New.png`,
       'Vibe Coding Assets (3) #14 Icy Large Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #14 Icy Large Grass Platform.png`,
     ]).then((i) => (assets.iceGrassLarge = i)),
