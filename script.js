@@ -25,6 +25,7 @@ const tutorialPanel = document.getElementById('tutorialPanel');
 const tutorialStepCount = document.getElementById('tutorialStepCount');
 const tutorialTitle = document.getElementById('tutorialTitle');
 const tutorialMessage = document.getElementById('tutorialMessage');
+const tutorialBackBtn = document.getElementById('tutorialBackBtn');
 const tutorialNextBtn = document.getElementById('tutorialNextBtn');
 const tutorialSkipBtn = document.getElementById('tutorialSkipBtn');
 const mobileControls = document.getElementById('mobileControls');
@@ -38,6 +39,16 @@ const shopOverlay = document.getElementById('shopOverlay');
 const shopCoins = document.getElementById('shopCoins');
 const shopItems = document.getElementById('shopItems');
 const shopCloseBtn = document.getElementById('shopCloseBtn');
+const titleHeading = document.getElementById('titleHeading');
+const secretBtn = document.getElementById('secretBtn');
+const secretRainLayer = document.getElementById('secretRainLayer');
+const secretUnlockOverlay = document.getElementById('secretUnlockOverlay');
+const secretUnlockBtn = document.getElementById('secretUnlockBtn');
+const secretPanelOverlay = document.getElementById('secretPanelOverlay');
+const secretCoinInput = document.getElementById('secretCoinInput');
+const secretCoinApplyBtn = document.getElementById('secretCoinApplyBtn');
+const secretPanelCloseBtn = document.getElementById('secretPanelCloseBtn');
+const secretPanelError = document.getElementById('secretPanelError');
 
 let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
@@ -64,6 +75,7 @@ let stars = [];
 let coins = [];
 let coinBursts = [];
 let coinBalance = 0;
+let spaceWins = 0;
 let spaceHazards = [];
 let damageCooldown = 0;
 let dropStartY = null;
@@ -87,6 +99,7 @@ const player = {
 // sprite assets (place your images in `assets/`)
 const assets = {
   heart: null,
+  coin: null,
   catSit: null,
   catStand: null,
   catWalk1: null,
@@ -94,9 +107,16 @@ const assets = {
   catCrawl1: null,
   catCrawl2: null,
   bgTitle: null,
+  hatCap: null,
+  hatParty: null,
+  hatCrown: null,
+  hatWitch: null,
   grassSmall: null,
   grassMedium: null,
   grassLarge: null,
+  iceGrassSmall: null,
+  iceGrassMedium: null,
+  iceGrassLarge: null,
   groundGrass: null,
 };
 let walkFrame = 0;
@@ -113,16 +133,22 @@ const unlockedHats = new Set(['none']);
 let tutorialActive = false;
 let tutorialStepIndex = 0;
 let highlightedTutorialTarget = null;
+let secretUnlocked = false;
+let secretAvailableAfterStart = false;
+let titleHoverTimer = null;
+let secretRainActive = false;
+let secretRainStopAt = 0;
+let secretRainDrops = [];
 
 const tutorialSteps = [
   {
     title: 'Goal',
-    message: 'Reach the Space Gate by climbing upward. You have 9 lives, so recover quickly after falls.',
+    message: 'Your goal is to reach space, do so by climbing upward.',
     target: 'goal',
   },
   {
     title: 'Lives',
-    message: 'This shows your remaining lives. If it reaches 0, the run ends.',
+    message: 'Ensure your lives last to reach your goal.',
     target: 'lives',
   },
   {
@@ -132,22 +158,22 @@ const tutorialSteps = [
   },
   {
     title: 'Height',
-    message: 'Height tracks your climb progress in meters.',
+    message: 'Track your progress in meters. Your goal is at 1000 meters.',
     target: 'height',
   },
   {
     title: 'Shop Button',
-    message: 'Open the shop here to buy and equip hats with your coins.',
+    message: 'Click the shop button to buy and equip hats with coins. Some hats will need to be obtained through achievements.',
     target: 'shopBtn',
   },
   {
     title: 'Reset Button',
-    message: 'Reset restarts from the beginning and clears progress after confirmation.',
+    message: 'Click the reset button to reset your progress and start from the beginning.',
     target: 'resetBtn',
   },
   {
     title: 'Quit Button',
-    message: 'Quit saves your current run and returns to title after confirmation.',
+    message: 'Click the quit button to save your current progress and return to the title.',
     target: 'quitBtn',
   },
   {
@@ -166,9 +192,193 @@ const tutorialSteps = [
 const hatCatalog = [
   { id: 'none', label: 'No Hat', cost: 0, color: '#ffffff' },
   { id: 'cap', label: 'Red Cap', cost: 12, color: '#df5252' },
-  { id: 'crown', label: 'Crown', cost: 25, color: '#f4ce46' },
+  { id: 'party', label: 'Party Hat', cost: 18, color: '#f48252' },
+  { id: 'crown', label: 'Crown', cost: 0, color: '#f4ce46', unlockType: 'spaceWins', requiredWins: 3 },
   { id: 'wizard', label: 'Wizard Hat', cost: 40, color: '#7f79df' },
 ];
+
+const spriteFilePaths = {
+  coin: 'Vibe Coding Assets (3) #12 Coin.png',
+  hats: {
+    cap: 'Vibe Coding Assets (3) #13 Cap.png',
+    party: 'Vibe Coding Assets (3) #14 Party Hat.png',
+    crown: 'Vibe Coding Assets (3) #15 Crown.png',
+    wizard: 'Vibe Coding Assets (3) #16 Witch Hat.png',
+  },
+};
+
+function encodeAssetPath(src) {
+  return src.split('/').map((seg) => encodeURIComponent(seg)).join('/');
+}
+
+function getHatSpritePath(hatId) {
+  return spriteFilePaths.hats[hatId] || null;
+}
+
+function getSelectedHatSprite() {
+  if (selectedHat === 'cap') return assets.hatCap;
+  if (selectedHat === 'party') return assets.hatParty;
+  if (selectedHat === 'crown') return assets.hatCrown;
+  if (selectedHat === 'wizard') return assets.hatWitch;
+  return null;
+}
+
+function getHatPlacement(hatId) {
+  if (hatId === 'cap') {
+    return { widthRatio: 0.56, heightRatio: 0.28, xOffset: 0.205, bottomYRatio: 0.21 };
+  }
+  if (hatId === 'party') {
+    return { widthRatio: 0.58, heightRatio: 0.35, xOffset: 0.165, bottomYRatio: 0.2 };
+  }
+  if (hatId === 'crown') {
+    return { widthRatio: 0.53, heightRatio: 0.3, xOffset: 0.135, bottomYRatio: 0.19 };
+  }
+  if (hatId === 'wizard') {
+    return { widthRatio: 0.65, heightRatio: 0.38, xOffset: 0.135, bottomYRatio: 0.21 };
+  }
+  return { widthRatio: 0.6, heightRatio: 0.34, xOffset: 0.135, bottomYRatio: 0.2 };
+}
+
+function syncAchievementUnlocks() {
+  if (spaceWins >= 3) {
+    unlockedHats.add('crown');
+  }
+}
+
+function showSecretUnlockModal() {
+  if (!secretUnlockOverlay) return;
+  secretUnlockOverlay.classList.remove('hidden');
+  secretUnlockOverlay.classList.add('active');
+}
+
+function hideSecretUnlockModal() {
+  if (!secretUnlockOverlay) return;
+  secretUnlockOverlay.classList.add('hidden');
+  secretUnlockOverlay.classList.remove('active');
+}
+
+function showSecretPanel() {
+  if (!secretUnlocked || !secretAvailableAfterStart || gameState !== 'playing' || !secretPanelOverlay) return;
+  hideWarningModal();
+  hideSecretUnlockModal();
+  closeShop();
+  if (secretPanelError) secretPanelError.textContent = '';
+  if (secretCoinInput) {
+    secretCoinInput.value = '';
+    secretCoinInput.focus();
+  }
+  secretPanelOverlay.classList.remove('hidden');
+  secretPanelOverlay.classList.add('active');
+}
+
+function hideSecretPanel() {
+  if (!secretPanelOverlay) return;
+  secretPanelOverlay.classList.add('hidden');
+  secretPanelOverlay.classList.remove('active');
+}
+
+function updateSecretButtonVisibility() {
+  if (!secretBtn) return;
+  secretBtn.classList.toggle('hidden', !(secretUnlocked && secretAvailableAfterStart && gameState === 'playing'));
+}
+
+function getSecretCatSpritePath() {
+  return encodeAssetPath('assets/cat_standNew.png');
+}
+
+function spawnSecretDrop() {
+  if (!secretRainLayer) return;
+  const isCat = Math.random() < 0.35;
+  const node = isCat ? document.createElement('img') : document.createElement('div');
+  node.className = `secret-rain-item ${isCat ? 'secret-rain-cat' : 'secret-rain-star'}`;
+  if (isCat) {
+    node.src = getSecretCatSpritePath();
+    node.alt = '';
+    node.decoding = 'async';
+  }
+
+  secretRainLayer.appendChild(node);
+  secretRainDrops.push({
+    node,
+    x: Math.random() * Math.max(40, window.innerWidth - 40),
+    y: -20 - Math.random() * 140,
+    vy: isCat ? (2.2 + Math.random() * 2.6) : (2.8 + Math.random() * 3.8),
+    vx: (Math.random() - 0.5) * (isCat ? 0.9 : 1.4),
+    rot: Math.random() * 360,
+    vr: (Math.random() - 0.5) * (isCat ? 2.2 : 6.0),
+    scale: isCat ? (0.8 + Math.random() * 0.45) : (0.7 + Math.random() * 0.7),
+  });
+}
+
+function startSecretRain() {
+  if (!secretRainLayer) return;
+  secretRainActive = true;
+  secretRainStopAt = performance.now() + 2300;
+  for (let i = 0; i < 34; i += 1) {
+    spawnSecretDrop();
+  }
+}
+
+function updateSecretRain() {
+  if (!secretRainLayer) return;
+  const now = performance.now();
+  if (secretRainActive && now < secretRainStopAt && Math.random() < 0.42) {
+    spawnSecretDrop();
+  }
+
+  const maxY = window.innerHeight + 60;
+  secretRainDrops = secretRainDrops.filter((drop) => {
+    drop.y += drop.vy;
+    drop.x += drop.vx;
+    drop.rot += drop.vr;
+    drop.node.style.transform = `translate(${Math.round(drop.x)}px, ${Math.round(drop.y)}px) rotate(${drop.rot.toFixed(1)}deg) scale(${drop.scale.toFixed(2)})`;
+    if (drop.y > maxY) {
+      drop.node.remove();
+      return false;
+    }
+    return true;
+  });
+
+  if (secretRainActive && now >= secretRainStopAt && secretRainDrops.length === 0) {
+    secretRainActive = false;
+  }
+}
+
+function unlockSecretPanel() {
+  if (secretUnlocked) return;
+  secretUnlocked = true;
+  if (titleHoverTimer) {
+    clearTimeout(titleHoverTimer);
+    titleHoverTimer = null;
+  }
+  if (titleHeading) titleHeading.classList.remove('arming');
+  updateSecretButtonVisibility();
+  startSecretRain();
+  showSecretUnlockModal();
+}
+
+function beginTitleHoverTimer() {
+  if (secretUnlocked || !titleHeading) return;
+  if (titleHoverTimer) clearTimeout(titleHoverTimer);
+  titleHeading.classList.add('arming');
+  titleHoverTimer = setTimeout(() => {
+    unlockSecretPanel();
+  }, 5000);
+}
+
+function cancelTitleHoverTimer() {
+  if (titleHoverTimer) {
+    clearTimeout(titleHoverTimer);
+    titleHoverTimer = null;
+  }
+  if (titleHeading) titleHeading.classList.remove('arming');
+}
+
+function ensureSelectedHatIsUnlocked() {
+  if (!unlockedHats.has(selectedHat)) {
+    selectedHat = 'none';
+  }
+}
 
 let audioCtx = null;
 
@@ -264,6 +474,7 @@ function renderTutorialStep() {
   tutorialStepCount.textContent = `Step ${tutorialStepIndex + 1}/${tutorialSteps.length}`;
   tutorialTitle.textContent = step.title;
   tutorialMessage.textContent = step.message;
+  if (tutorialBackBtn) tutorialBackBtn.disabled = tutorialStepIndex === 0;
   tutorialNextBtn.textContent = tutorialStepIndex === tutorialSteps.length - 1 ? 'Finish' : 'Next';
 
   const target = getTutorialTargetRect(step);
@@ -313,6 +524,12 @@ function nextTutorialStep() {
   renderTutorialStep();
 }
 
+function previousTutorialStep() {
+  if (!tutorialActive || tutorialStepIndex <= 0) return;
+  tutorialStepIndex -= 1;
+  renderTutorialStep();
+}
+
 function updateCoinsHUD() {
   if (coinsText) coinsText.textContent = `Coins: ${coinBalance}`;
   if (shopCoins) shopCoins.textContent = `Coins: ${coinBalance}`;
@@ -321,15 +538,22 @@ function updateCoinsHUD() {
 function createHatPreview(hatId) {
   const preview = document.createElement('div');
   preview.className = 'hat-preview';
-  const base = document.createElement('div');
-  base.className = 'hat-preview-base';
-  preview.appendChild(base);
 
   if (hatId === 'none') {
     const none = document.createElement('div');
     none.className = 'hat-preview-none';
     none.textContent = 'No Hat';
     preview.appendChild(none);
+    return preview;
+  }
+
+  const spritePath = getHatSpritePath(hatId);
+  if (spritePath) {
+    const img = document.createElement('img');
+    img.className = 'hat-preview-image';
+    img.alt = `${hatId} hat`;
+    img.src = encodeAssetPath(spritePath);
+    preview.appendChild(img);
     return preview;
   }
 
@@ -373,15 +597,29 @@ function renderShop() {
     card.appendChild(title);
 
     const price = document.createElement('p');
-    price.textContent = hat.cost === 0 ? 'Free' : `${hat.cost} coins`;
+    if (hat.unlockType === 'spaceWins') {
+      const winsLeft = Math.max(0, (hat.requiredWins || 0) - spaceWins);
+      price.textContent = winsLeft === 0
+        ? `Achievement unlocked (${spaceWins}/${hat.requiredWins})`
+        : `Reach Space ${hat.requiredWins}x (${spaceWins}/${hat.requiredWins})`;
+    } else {
+      price.textContent = hat.cost === 0 ? 'Free' : `${hat.cost} coins`;
+    }
     card.appendChild(price);
 
     const btn = document.createElement('button');
+    const achievementLocked = hat.unlockType === 'spaceWins' && spaceWins < (hat.requiredWins || 0);
     const owned = unlockedHats.has(hat.id);
     const selected = selectedHat === hat.id;
-    btn.textContent = selected ? 'Equipped' : owned ? 'Equip' : 'Buy';
-    btn.disabled = selected;
+    if (achievementLocked) {
+      btn.textContent = 'Locked';
+      btn.disabled = true;
+    } else {
+      btn.textContent = selected ? 'Equipped' : owned ? 'Equip' : 'Buy';
+      btn.disabled = selected;
+    }
     btn.addEventListener('click', () => {
+      if (achievementLocked) return;
       const hasHat = unlockedHats.has(hat.id);
       if (!hasHat && coinBalance < hat.cost) {
         showWarningModal('Insufficient Funds', 'Insufficient Funds', () => {});
@@ -418,6 +656,43 @@ function closeShop() {
 
 function drawHatAt(x, y, w, h) {
   if (selectedHat === 'none') return;
+
+  const hatSprite = getSelectedHatSprite();
+  if (hatSprite) {
+    const frame = getSpriteFrame(hatSprite);
+    const placement = getHatPlacement(selectedHat);
+    const maxW = Math.round(w * placement.widthRatio);
+    const maxH = Math.round(h * placement.heightRatio);
+    const scale = Math.min(maxW / frame.sw, maxH / frame.sh);
+    const drawW = Math.max(8, Math.round(frame.sw * scale));
+    const drawH = Math.max(8, Math.round(frame.sh * scale));
+    // Keep hats attached to the head side by making horizontal offset follow facing direction.
+    const facingOffset = (player.facingRight ? 1 : -1) * (w * placement.xOffset);
+    let drawX = Math.round(x + (w - drawW) / 2 + facingOffset);
+    const spritePixelScale = drawW / frame.sw;
+    if (selectedHat === 'cap') {
+      // Move cap further left by 4 sprite pixels for a clearly visible shift.
+      drawX -= Math.round(spritePixelScale * 4);
+    } else if (selectedHat === 'crown') {
+      // Nudge crown right by 1 sprite pixel.
+      drawX += Math.round(spritePixelScale * 1);
+    }
+    const drawY = Math.round(y + (h * placement.bottomYRatio) - drawH);
+    const shouldFaceRight = player.facingRight;
+    // Cap uses opposite orientation from previous tuning so the thin strap side stays at the cat's back.
+    const drawFacingRight = selectedHat === 'cap' ? shouldFaceRight : shouldFaceRight;
+    ctx.save();
+    if (drawFacingRight) {
+      ctx.drawImage(hatSprite, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
+    } else {
+      ctx.translate(drawX + drawW, drawY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(hatSprite, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, drawW, drawH);
+    }
+    ctx.restore();
+    return;
+  }
+
   const hatY = y - Math.round(h * 0.16);
   if (selectedHat === 'cap') {
     ctx.fillStyle = '#df5252';
@@ -608,6 +883,7 @@ function saveProgress() {
   savedProgress = {
     lives,
     coinBalance,
+    spaceWins,
     selectedHat,
     unlockedHats: Array.from(unlockedHats),
     cameraY,
@@ -632,9 +908,12 @@ function restoreProgress() {
   if (!savedProgress) return false;
   lives = savedProgress.lives;
   coinBalance = savedProgress.coinBalance || 0;
+  spaceWins = savedProgress.spaceWins || 0;
   selectedHat = savedProgress.selectedHat || 'none';
   unlockedHats.clear();
   (savedProgress.unlockedHats || ['none']).forEach((h) => unlockedHats.add(h));
+  syncAchievementUnlocks();
+  ensureSelectedHatIsUnlocked();
   cameraY = savedProgress.cameraY;
   dropStartY = savedProgress.dropStartY;
   player.x = savedProgress.player.x;
@@ -645,7 +924,11 @@ function restoreProgress() {
   player.facingRight = savedProgress.player.facingRight;
   player.onGround = savedProgress.player.onGround;
   player.onIce = savedProgress.player.onIce;
-  platforms = savedProgress.platforms.map((p) => ({ ...p }));
+  platforms = savedProgress.platforms.map((p) => ({
+    ...p,
+    variant: p.variant === 'breakable' ? 'normal' : p.variant,
+    waitTime: 0,
+  }));
   coins = (savedProgress.coins || []).map((c) => ({ ...c }));
   spaceHazards = (savedProgress.spaceHazards || []).map((h) => ({ ...h }));
   gameState = 'playing';
@@ -660,10 +943,12 @@ function resetGame(keepProgress = false) {
   lives = 9;
   if (!keepProgress) {
     coinBalance = 0;
+    spaceWins = 0;
     selectedHat = 'none';
     unlockedHats.clear();
     unlockedHats.add('none');
   }
+  syncAchievementUnlocks();
   savedProgress = null;
   player.x = WIDTH / 2 - 24;
   player.y = GROUND_Y - player.height;
@@ -807,15 +1092,13 @@ function createPlatforms() {
   const pickVariantForBiome = (biome) => {
     const roll = Math.random();
     if (biome === 'earth') {
-      return roll < 0.16 ? 'breakable' : 'normal';
-    }
-    if (biome === 'cloud') {
-      if (roll < 0.12) return 'breakable';
-      if (roll < 0.34) return 'ice';
       return 'normal';
     }
-    if (roll < 0.10) return 'breakable';
-    if (roll < 0.38) return 'ice';
+    if (biome === 'cloud') {
+      if (roll < 0.22) return 'ice';
+      return 'normal';
+    }
+    if (roll < 0.28) return 'ice';
     return 'normal';
   };
 
@@ -857,7 +1140,7 @@ function createPlatforms() {
     lastMainWidth = width;
 
     // Coins only spawn on the main climb path so every coin remains collectible.
-    if (variant !== 'breakable' && Math.random() < 0.55) {
+    if (Math.random() < 0.55) {
       coins.push({ x: mainX + width / 2, y: y - 16, collected: false });
     }
 
@@ -901,7 +1184,6 @@ function createStars() {
 }
 
 function loadAssets(basePath = 'assets') {
-  const encodeAssetPath = (src) => src.split('/').map((seg) => encodeURIComponent(seg)).join('/');
   const load = (src) => new Promise((res) => {
     const img = new Image();
     img.onload = () => res(img);
@@ -921,6 +1203,10 @@ function loadAssets(basePath = 'assets') {
 
   return Promise.all([
     load(`${basePath}/heart.png`).then((i) => (assets.heart = i)),
+    loadFirstPaths([
+      spriteFilePaths.coin,
+      `${basePath}/${spriteFilePaths.coin}`,
+    ]).then((i) => (assets.coin = i)),
     loadFirst(['cat_sitNew.png', 'cat_sit_new.png', 'cat_sitNEW.png', 'cat_sit.png']).then((i) => (assets.catSit = i)),
     loadFirst(['cat_standNew.png', 'cat_stand_new.png', 'cat_standNEW.png', 'cat_stand.png']).then((i) => (assets.catStand = i)),
     loadFirst(['cat_walk1New.png', 'cat_walk1_new.png', 'cat_walk1NEW.png', 'cat_walk1.png']).then((i) => (assets.catWalk1 = i)),
@@ -929,14 +1215,38 @@ function loadAssets(basePath = 'assets') {
     loadFirst(['cat_crawl2New.png', 'cat_crawl2_new.png', 'cat_crawl2NEW.png', 'cat_crawl2.png']).then((i) => (assets.catCrawl2 = i)),
     load(`${basePath}/bg_title.png`).then((i) => (assets.bgTitle = i)),
     loadFirstPaths([
+      spriteFilePaths.hats.cap,
+      `${basePath}/${spriteFilePaths.hats.cap}`,
+    ]).then((i) => (assets.hatCap = i)),
+    loadFirstPaths([
+      spriteFilePaths.hats.party,
+      `${basePath}/${spriteFilePaths.hats.party}`,
+    ]).then((i) => (assets.hatParty = i)),
+    loadFirstPaths([
+      spriteFilePaths.hats.crown,
+      `${basePath}/${spriteFilePaths.hats.crown}`,
+    ]).then((i) => (assets.hatCrown = i)),
+    loadFirstPaths([
+      spriteFilePaths.hats.wizard,
+      `${basePath}/${spriteFilePaths.hats.wizard}`,
+    ]).then((i) => (assets.hatWitch = i)),
+    loadFirstPaths([
       'Vibe Coding Assets (3) #8 Small Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #8 Small Grass Platform.png`,
     ]).then((i) => (assets.grassSmall = i)),
+    loadFirstPaths([
+      'Vibe Coding Assets (3) #12 Icy Small Grass Platform.png',
+      `${basePath}/Vibe Coding Assets (3) #12 Icy Small Grass Platform.png`,
+    ]).then((i) => (assets.iceGrassSmall = i)),
     // Name correction: file labeled #10 Large is the medium platform art.
     loadFirstPaths([
       'Vibe Coding Assets (3) #10 Large Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #10 Large Grass Platform.png`,
     ]).then((i) => (assets.grassMedium = i)),
+    loadFirstPaths([
+      'Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png',
+      `${basePath}/Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png`,
+    ]).then((i) => (assets.iceGrassMedium = i)),
     // Prefer the newly uploaded large platform art, with the older file as fallback.
     loadFirstPaths([
       'Vibe Coding Assets (3) #10 Large Grass Platform New.png',
@@ -944,6 +1254,10 @@ function loadAssets(basePath = 'assets') {
       'Vibe Coding Assets (3) #9 Medium Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #9 Medium Grass Platform.png`,
     ]).then((i) => (assets.grassLarge = i)),
+    loadFirstPaths([
+      'Vibe Coding Assets (3) #14 Icy Large Grass Platform.png',
+      `${basePath}/Vibe Coding Assets (3) #14 Icy Large Grass Platform.png`,
+    ]).then((i) => (assets.iceGrassLarge = i)),
     loadFirstPaths([
       'Vibe Coding Assets (3) #11 Ground Grass New.png',
       'Assets/Vibe Coding Assets (3) #11 Ground Grass New.png',
@@ -1009,10 +1323,14 @@ function showScreen(screen) {
     deathScreen.classList.remove('hidden');
     deathScreen.classList.add('active');
   }
+
+  updateSecretButtonVisibility();
 }
 
 function startGame() {
   endGuidedTutorial();
+  secretAvailableAfterStart = true;
+  updateSecretButtonVisibility();
   if (gameState === 'title' && restoreProgress()) {
     return;
   }
@@ -1029,6 +1347,8 @@ function startGame() {
 
 function winGame() {
   endGuidedTutorial();
+  spaceWins += 1;
+  syncAchievementUnlocks();
   gameState = 'win';
   spawnConfetti();
   showScreen('win');
@@ -1151,11 +1471,12 @@ function drawPlatforms() {
   platforms.forEach((plat) => {
     const screenY = plat.y - cameraY;
     const spriteKey = plat.spriteSize || (plat.width >= 220 ? 'large' : plat.width >= 165 ? 'medium' : 'small');
+    const isIcePlatform = plat.variant === 'ice';
     const platformArt = spriteKey === 'large'
-      ? assets.grassLarge
+      ? (isIcePlatform ? assets.iceGrassLarge : assets.grassLarge)
       : spriteKey === 'medium'
-        ? assets.grassMedium
-        : assets.grassSmall;
+        ? (isIcePlatform ? assets.iceGrassMedium : assets.grassMedium)
+        : (isIcePlatform ? assets.iceGrassSmall : assets.grassSmall);
     const fallbackPlatformArt = platformArt || assets.grassMedium || assets.grassLarge || assets.grassSmall;
     const groundArt = assets.groundGrass || assets.grassLarge || assets.grassMedium || assets.grassSmall;
 
@@ -1200,22 +1521,30 @@ function drawPlatforms() {
       }
     }
 
-    if (plat.type === 'platform') {
-      if (plat.variant === 'breakable') {
-        if (plat.waitTime > 60) {
-          ctx.fillStyle = 'rgba(255,120,80,0.3)';
-          ctx.fillRect(plat.x, screenY, plat.width, plat.height);
-        }
-      }
-    }
   });
 }
 
 function drawCoins() {
+  const time = performance.now() * 0.0042;
+  const bobAmplitude = 3;
   coins.forEach((coin) => {
     if (coin.collected) return;
-    const cy = coin.y - cameraY;
+    const bobOffset = Math.sin(time + (coin.x * 0.05) + (coin.y * 0.002)) * bobAmplitude;
+    const cy = coin.y - cameraY + bobOffset;
     if (cy < -30 || cy > HEIGHT + 30) return;
+
+    if (assets.coin) {
+      const frame = getSpriteFrame(assets.coin);
+      const maxSize = 16;
+      const scale = Math.min(maxSize / frame.sw, maxSize / frame.sh);
+      const drawW = Math.max(8, Math.round(frame.sw * scale));
+      const drawH = Math.max(8, Math.round(frame.sh * scale));
+      const drawX = Math.round(coin.x - drawW / 2);
+      const drawY = Math.round(cy - drawH / 2);
+      ctx.drawImage(assets.coin, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
+      return;
+    }
+
     ctx.fillStyle = '#ffd84d';
     ctx.fillRect(Math.round(coin.x - 6), Math.round(cy - 6), 12, 12);
     ctx.fillStyle = '#ffef9a';
@@ -1347,7 +1676,6 @@ function applyPhysics() {
   const wasOnGround = player.onGround;
   player.onGround = false;
   player.onIce = false;
-  let standingPlatform = null;
 
   if (damageCooldown > 0) damageCooldown -= 1;
   if (jumpBufferFrames > 0) jumpBufferFrames -= 1;
@@ -1394,7 +1722,6 @@ function applyPhysics() {
       player.onGround = true;
       player.jumpCount = 0;
       if (plat.variant === 'ice') player.onIce = true;
-      if (plat.variant === 'breakable') standingPlatform = plat;
     } else if (playerTop >= platformBottom && newTop <= platformBottom && player.vy < 0) {
       player.y = platformBottom;
       player.vy = 0;
@@ -1484,20 +1811,6 @@ function applyPhysics() {
       updateCoinsHUD();
     }
   });
-
-  if (standingPlatform) {
-    standingPlatform.waitTime += 1;
-    if (standingPlatform.waitTime >= 120) {
-      platforms = platforms.filter((plat) => plat !== standingPlatform);
-      // platform broke while player was standing - start falling
-      dropStartY = player.y;
-      player.onGround = false;
-    }
-  } else {
-    platforms.forEach((plat) => {
-      if (plat.variant === 'breakable') plat.waitTime = 0;
-    });
-  }
 
   const scale = Math.max(1.0, HEIGHT / 900);
   const groundJump = -19.8 * scale;
@@ -1624,6 +1937,7 @@ function update() {
 }
 
 function loop() {
+  updateSecretRain();
   if (gameState !== 'title') {
     update();
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
@@ -1642,6 +1956,11 @@ if (startBtn) {
 if (introBtn) {
   introBtn.addEventListener('click', () => {
     startGuidedTutorial();
+  });
+}
+if (secretBtn) {
+  secretBtn.addEventListener('click', () => {
+    showSecretPanel();
   });
 }
 if (backBtn) {
@@ -1724,6 +2043,43 @@ if (deathQuitBtn) {
   });
 }
 
+if (secretUnlockBtn) {
+  secretUnlockBtn.addEventListener('click', () => {
+    hideSecretUnlockModal();
+  });
+}
+
+if (secretPanelCloseBtn) {
+  secretPanelCloseBtn.addEventListener('click', () => {
+    hideSecretPanel();
+  });
+}
+
+if (secretCoinApplyBtn) {
+  secretCoinApplyBtn.addEventListener('click', () => {
+    if (!secretCoinInput) return;
+    const raw = secretCoinInput.value.trim();
+    const parsed = Number(raw);
+    if (!raw || !Number.isFinite(parsed)) {
+      if (secretPanelError) {
+        secretPanelError.style.color = '#ffd68f';
+        secretPanelError.textContent = 'Enter a valid number.';
+      }
+      return;
+    }
+
+    const rounded = Math.round(parsed);
+    const amount = clamp(rounded, 0, 1000000);
+    coinBalance += amount;
+    updateCoinsHUD();
+    if (secretPanelError) {
+      secretPanelError.style.color = '#ffed61';
+      secretPanelError.textContent = `${amount} coins added.`;
+    }
+    secretCoinInput.value = '';
+  });
+}
+
 window.addEventListener('keydown', (event) => {
   if (tutorialActive) {
     if (event.code === 'Escape') endGuidedTutorial();
@@ -1740,10 +2096,34 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
     return;
   }
+  if (secretUnlockOverlay && !secretUnlockOverlay.classList.contains('hidden')) {
+    if (event.code === 'Escape') hideSecretUnlockModal();
+    event.preventDefault();
+    return;
+  }
+  if (secretPanelOverlay && !secretPanelOverlay.classList.contains('hidden')) {
+    if (event.code === 'Escape') {
+      hideSecretPanel();
+      event.preventDefault();
+      return;
+    }
+    if (event.target === secretCoinInput || document.activeElement === secretCoinInput) {
+      return;
+    }
+    event.preventDefault();
+    return;
+  }
   handleInput(event, true);
 });
 window.addEventListener('keyup', (event) => {
   if (tutorialActive) {
+    event.preventDefault();
+    return;
+  }
+  if (secretPanelOverlay && !secretPanelOverlay.classList.contains('hidden')) {
+    if (event.target === secretCoinInput || document.activeElement === secretCoinInput) {
+      return;
+    }
     event.preventDefault();
     return;
   }
@@ -1759,6 +2139,7 @@ window.addEventListener('blur', () => {
 });
 
 showScreen('title');
+updateSecretButtonVisibility();
 // initialize canvas size and content
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -1781,6 +2162,12 @@ if (warningCancelBtn) {
 if (tutorialNextBtn) {
   tutorialNextBtn.addEventListener('click', () => {
     nextTutorialStep();
+  });
+}
+
+if (tutorialBackBtn) {
+  tutorialBackBtn.addEventListener('click', () => {
+    previousTutorialStep();
   });
 }
 
@@ -1843,6 +2230,11 @@ loadAssets().finally(() => {
   createPlatforms();
   drawLives();
 });
+
+if (titleHeading) {
+  titleHeading.addEventListener('mouseenter', beginTitleHoverTimer);
+  titleHeading.addEventListener('mouseleave', cancelTitleHoverTimer);
+}
 
 showScreen('title');
 loop();

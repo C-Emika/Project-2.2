@@ -9,7 +9,7 @@
 <body>
   <div id="titleScreen" class="overlay active">
       <div class="screen-panel">
-        <h1>Cat Climb</h1>
+        <h1 id="titleHeading">Cat Climb</h1>
         <p>Guide the cat safely through a dreamy sky climb.</p>
         <div class="button-row">
           <button id="startBtn">Start</button>
@@ -18,18 +18,19 @@
       </div>
   </div>
 
+  <div id="secretRainLayer" class="secret-rain-layer" aria-hidden="true"></div>
+
   <div id="introScreen" class="overlay hidden">
       <div class="screen-panel">
         <h2>Tutorial</h2>
         <ul>
-          <li><strong>Goal:</strong> Climb from Earth to Space before you run out of lives.</li>
-          <li><strong>Move:</strong> Left / Right arrows or <strong>A / D</strong>.</li>
-          <li><strong>Jump:</strong> Up arrow, <strong>W</strong>, or <strong>Space</strong> (double jump is enabled).</li>
-          <li><strong>Crouch/Crawl:</strong> Hold Down arrow or <strong>S</strong> to crouch and crawl.</li>
-          <li><strong>Mobile:</strong> Use on-screen Left/Right/Down/Up buttons.</li>
-          <li><strong>Ice Platforms:</strong> Ice appears high up and is slippery, so time jumps carefully.</li>
-          <li><strong>Coins + Shop:</strong> Collect coins and spend them on hats from the Shop button.</li>
-          <li><strong>Safety:</strong> Reset and Quit will show a warning before action.</li>
+          <li>Your goal is to reach space, do so by climbing upward.</li>
+          <li>Ensure your lives last to reach your goal.</li>
+          <li>Collect coins from platforms during your climb.</li>
+          <li>Track your progress in meters. Your goal is at 1000 meters.</li>
+          <li>Click the shop button to buy and equip hats with coins. Some hats will need to be obtained through achievements.</li>
+          <li>Click the reset button to reset your progress and start from the beginning.</li>
+          <li>Click the quit button to save your current progress and return to the title.</li>
         </ul>
         <button id="backBtn">Back</button>
       </div>
@@ -90,12 +91,34 @@
     </div>
   </div>
 
+  <div id="secretUnlockOverlay" class="overlay warning-overlay secret-unlock-overlay hidden">
+    <div class="secret-panel">
+      <h2>Secret Panel</h2>
+      <p>You unlocked the secret panel!</p>
+      <button id="secretUnlockBtn">Awesome</button>
+    </div>
+  </div>
+
+  <div id="secretPanelOverlay" class="overlay warning-overlay hidden">
+    <div class="secret-panel">
+      <h2>Secret Panel</h2>
+      <p>Enter your prefered amount of coins. (0-1,000,000)</p>
+      <input id="secretCoinInput" class="secret-input" type="number" min="0" max="1000000" step="1" inputmode="numeric" placeholder="0-1000000" />
+      <p id="secretPanelError" class="secret-error" aria-live="polite"></p>
+      <div class="button-row warning-actions">
+        <button id="secretCoinApplyBtn">Add Coins</button>
+        <button id="secretPanelCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="tutorialOverlay" class="overlay tutorial-overlay hidden" aria-live="polite">
     <div id="tutorialPanel" class="tutorial-panel" data-arrow="none">
       <div class="tutorial-step-count" id="tutorialStepCount">Step 1/1</div>
       <h2 id="tutorialTitle">Tutorial</h2>
       <p id="tutorialMessage"></p>
       <div class="button-row tutorial-actions">
+        <button id="tutorialBackBtn">Back</button>
         <button id="tutorialNextBtn">Next</button>
         <button id="tutorialSkipBtn">Skip</button>
       </div>
@@ -108,6 +131,8 @@
     <button id="mobileDown" class="mobile-control-btn mobile-down" aria-label="Sit down"></button>
     <button id="mobileJump" class="mobile-control-btn mobile-up" aria-label="Jump"></button>
   </div>
+
+  <button id="secretBtn" class="hud-button hidden">Secret Panel</button>
 
   <script src="script.js"></script>
 </body>

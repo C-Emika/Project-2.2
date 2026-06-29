@@ -143,6 +143,14 @@ h1, h2 {
   text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.85);
 }
 
+#titleHeading {
+  cursor: default;
+}
+
+#titleHeading.arming {
+  text-shadow: 0 0 7px rgba(255, 241, 156, 0.45), 3px 3px 0 rgba(0, 0, 0, 0.85);
+}
+
 /* Ensure all text elements explicitly use one of the two supplied fonts */
 p, li, button, .hud, #hud div, .button-row, .screen-panel, ul {
   font-family: 'Vibe Coding Title', 'Vibe Coding Body', system-ui, sans-serif;
@@ -324,6 +332,94 @@ button:hover {
   box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
 }
 
+.secret-panel {
+  width: min(600px, 92vw);
+  background: #121936;
+  border: 4px solid #6a6fc9;
+  border-radius: 2px;
+  padding: 22px;
+  text-align: center;
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
+}
+
+#secretBtn {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  pointer-events: auto;
+}
+
+.secret-unlock-overlay {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.secret-panel h2 {
+  margin-bottom: 8px;
+  font-size: clamp(30px, 4vw, 44px);
+}
+
+.secret-panel p {
+  margin-bottom: 12px;
+  line-height: 1.4;
+  font-size: clamp(14px, 1.8vw, 16px);
+}
+
+.secret-input {
+  width: min(280px, 100%);
+  background: rgba(7, 12, 31, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.32);
+  color: #fff;
+  font-size: clamp(18px, 2.4vw, 24px);
+  text-align: center;
+  border-radius: 2px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.secret-error {
+  min-height: 1.4em;
+  color: #ffd68f;
+  margin-bottom: 8px;
+}
+
+.secret-rain-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.secret-rain-item {
+  position: absolute;
+  transform-origin: center;
+  image-rendering: pixelated;
+  will-change: transform;
+}
+
+.secret-rain-cat {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+}
+
+.secret-rain-star {
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+  clip-path: polygon(50% 0%, 62% 36%, 100% 50%, 62% 64%, 50% 100%, 38% 64%, 0% 50%, 38% 36%);
+}
+
+@media (max-width: 680px) {
+  .secret-unlock-overlay {
+    padding: 24px;
+  }
+}
+
 .warning-panel h2 {
   margin-bottom: 8px;
 }
@@ -403,6 +499,26 @@ button:hover {
 
 .tutorial-actions {
   margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tutorial-actions button {
+  min-width: 0;
+  width: 100%;
+  padding: 12px 8px;
+  font-size: clamp(13px, 1.8vw, 16px);
+}
+
+@media (max-width: 420px) {
+  .tutorial-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tutorial-actions button:last-child {
+    grid-column: 1 / -1;
+  }
 }
 
 .tutorial-highlight {
@@ -522,20 +638,20 @@ button:hover {
 
 .hat-preview {
   position: relative;
-  width: 78px;
-  height: 54px;
+  width: 106px;
+  height: 76px;
   margin: 0 auto 8px;
 }
 
-.hat-preview-base {
+.hat-preview-image {
   position: absolute;
   left: 50%;
-  bottom: 6px;
+  top: 2px;
   transform: translateX(-50%);
-  width: 40px;
-  height: 24px;
-  background: #111;
-  border: 2px solid #000;
+  width: 66px;
+  height: 52px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .hat-preview-none {
