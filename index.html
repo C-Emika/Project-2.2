@@ -29,6 +29,7 @@
           <li>Collect coins from platforms during your climb.</li>
           <li>Track your progress in meters. Your goal is at 1000 meters.</li>
           <li>Click the hats button to buy and equip hats with coins. Some hats will need to be obtained through achievements.</li>
+          <li>Click the achievements button to view unlock goals and track your progress.</li>
           <li>Click the reset button to reset your progress and start from the beginning.</li>
           <li>Click the quit button to save your current progress and return to the title.</li>
         </ul>
@@ -151,7 +152,31 @@
     <button id="mobileJump" class="mobile-control-btn mobile-up" aria-label="Jump"></button>
   </div>
 
-  <button id="secretBtn" class="hud-button hidden">Secret Pawnel</button>
+  <button id="secretBtn" class="hud-button hidden">Admin Pawnel</button>
+
+  <div id="adminPanelOverlay" class="overlay warning-overlay hidden">
+    <div class="admin-panel">
+      <h2>Admin Pawnel</h2>
+      <div class="admin-section">
+        <h3>Hats</h3>
+        <button id="adminUnlockAllHatsBtn" class="admin-action-btn">Unlock All Hats</button>
+      </div>
+      <div class="admin-section">
+        <h3>Achievements</h3>
+        <button id="adminUnlockAllAchievementsBtn" class="admin-action-btn">Unlock All Achievements</button>
+      </div>
+      <div class="admin-section">
+        <h3>Coins</h3>
+        <p>Enter your preferred amount of coins. (0-1,000,000)</p>
+        <input id="adminCoinInput" class="admin-coin-input" type="number" min="0" max="1000000" step="1" inputmode="numeric" placeholder="0-1000000" />
+        <p id="adminCoinError" class="admin-error" aria-live="polite"></p>
+        <button id="adminCoinApplyBtn" class="admin-action-btn">Add Coins</button>
+      </div>
+      <div class="button-row warning-actions">
+        <button id="adminPanelCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

@@ -617,12 +617,17 @@ button:hover {
 
 .shop-panel {
   width: min(760px, 92vw);
+  max-height: min(84vh, 860px);
   background: #121936;
   border: 4px solid #6a6fc9;
   border-radius: 2px;
   padding: 20px;
   text-align: center;
   box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
 }
 
 .shop-panel h2 {
@@ -630,14 +635,18 @@ button:hover {
 }
 
 #shopCoins {
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 .shop-items {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 6px;
 }
 
 .shop-item {
@@ -658,15 +667,18 @@ button:hover {
 }
 
 .achievements-panel {
-  max-height: min(78vh, 760px);
-  overflow: auto;
+  max-height: min(84vh, 860px);
 }
 
 .achievements-list {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 6px;
 }
 
 .achievement-card {
@@ -703,8 +715,8 @@ button:hover {
 
 .hat-preview {
   position: relative;
-  width: 148px;
-  height: 104px;
+  width: 186px;
+  height: 142px;
   margin: 0 auto 8px;
 }
 
@@ -713,8 +725,8 @@ button:hover {
   left: 50%;
   top: 0;
   transform: translateX(-50%);
-  width: 96px;
-  height: 78px;
+  width: 132px;
+  height: 108px;
   object-fit: contain;
   image-rendering: pixelated;
 }
@@ -724,16 +736,31 @@ button:hover {
   left: 50%;
   top: 0;
   transform: translateX(-50%);
-  width: 96px;
-  height: 78px;
+  width: 132px;
+  height: 108px;
   pointer-events: none;
   background: var(--hat-tint, transparent);
   opacity: 0;
   mix-blend-mode: multiply;
+  --hat-mask-url: none;
+  -webkit-mask-image: var(--hat-mask-url);
+  mask-image: var(--hat-mask-url);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
 
 .hat-preview-has-tint .hat-preview-tint {
   opacity: 0.62;
+}
+
+.hat-preview-locked-sprite .hat-preview-tint {
+  opacity: 0.72;
+  background: rgba(0, 0, 0, 0.9);
+  mix-blend-mode: multiply;
 }
 
 .hat-preview-locked::after {
@@ -745,10 +772,10 @@ button:hover {
 
 .hat-preview-none {
   position: absolute;
-  top: 5px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.9;
 }
 
@@ -817,6 +844,7 @@ button:hover {
   gap: 8px;
   margin: 8px 0 10px;
   width: 100%;
+  min-height: 50px;
   padding: 8px 10px;
   border: 2px solid rgba(255, 255, 255, 0.24);
   background: rgba(8, 14, 36, 0.78);
@@ -837,4 +865,90 @@ button:hover {
 .hat-color-input:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+.hat-color-wrap-empty {
+  visibility: hidden;
+}
+
+.admin-panel {
+  width: min(500px, 92vw);
+  background: #121936;
+  border: 4px solid #f4ce46;
+  border-radius: 2px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
+}
+
+.admin-panel h2 {
+  margin-bottom: 16px;
+  color: #f4ce46;
+  font-size: clamp(20px, 2.4vw, 24px);
+}
+
+.admin-section {
+  margin-bottom: 20px;
+  padding: 12px;
+  border: 2px solid rgba(244, 206, 70, 0.3);
+  border-radius: 2px;
+  background: rgba(244, 206, 70, 0.08);
+}
+
+.admin-section h3 {
+  margin-bottom: 10px;
+  color: #f4ce46;
+  font-size: clamp(15px, 2vw, 18px);
+}
+
+.admin-action-btn {
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: #6a6fc9;
+  border: 2px solid #8a8fdd;
+  border-radius: 2px;
+  color: #fff;
+  font-size: clamp(14px, 1.8vw, 16px);
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-action-btn:hover {
+  background: #8a8fdd;
+  box-shadow: 0 0 8px rgba(138, 143, 221, 0.6);
+}
+
+.admin-action-btn:active {
+  transform: scale(0.98);
+}
+
+.admin-coin-input {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 2px solid rgba(244, 206, 70, 0.4);
+  border-radius: 2px;
+  background: rgba(8, 14, 36, 0.9);
+  color: #fff;
+  font-size: clamp(14px, 1.8vw, 16px);
+  font-family: inherit;
+}
+
+.admin-coin-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.admin-coin-input:focus {
+  outline: none;
+  border-color: rgba(244, 206, 70, 0.8);
+  box-shadow: 0 0 6px rgba(244, 206, 70, 0.4);
+}
+
+.admin-error {
+  font-size: clamp(12px, 1.4vw, 14px);
+  margin-bottom: 8px;
+  min-height: 1.2em;
+  line-height: 1.2;
 }
