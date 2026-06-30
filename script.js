@@ -188,6 +188,7 @@ let currentAccountKey = '';
 let pendingStartAction = null;
 let leaderboardRecords = [];
 let totalJumps = 0;
+let topHatSafetyNetEnabled = true;
 const maskedHatSpriteCache = new Map();
 const grayscaleHatSpriteCache = new Map();
 const tintedHatSpriteCache = new Map();
@@ -196,6 +197,9 @@ const ACCOUNT_STORAGE_KEY = 'project2_2_accounts_v1';
 const LEADERBOARD_STORAGE_KEY = 'project2_2_leaderboard_v2';
 let accountStore = {};
 const BLOCKED_LEADERBOARD_NAMES = new Set(['osj']);
+const TOP_HAT_SAFETY_NET_COST = 75;
+const TOP_HAT_COIN_MAGNET_RADIUS = 190;
+const TOP_HAT_COIN_MAGNET_PULL = 0.2;
 
 const achievementCatalog = {
   jump_first: {
@@ -352,7 +356,7 @@ const spriteFilePaths = {
     top: 'Vibe Coding Assets (3) #22 Top Hat.png',
     chef: 'Vibe Coding Assets (3) #23 Chef Hat.png',
     cowboy: 'Vibe Coding Assets (3) #24 Cowboy Hat.png',
-    frog: 'Vibe Coding Assets (3) #25 Frog Hat.png',
+    frog: 'Vibe Coding Assets (3) #25 Frog Hat New.png',
   },
 };
 
@@ -422,6 +426,13 @@ function getHatPreviewImageCandidates(hatId) {
 
   if (hatId === 'frog') {
     const frogVariants = [
+      'Vibe Coding Assets (3) #25 Frog Hat New.png',
+      'Vibe Coding Assets (3) #25 Frog Hat new.png',
+      'Vibe Coding Assets (3) #25 Frog hat new.png',
+      'assets/Vibe Coding Assets (3) #25 Frog Hat New.png',
+      'assets/Vibe Coding Assets (3) #25 Frog Hat new.png',
+      'Assets/Vibe Coding Assets (3) #25 Frog Hat New.png',
+      'Assets/Vibe Coding Assets (3) #25 Frog Hat new.png',
       'Vibe Coding Assets (3) #25 Frog Hat.png',
       'Vibe Coding Assets (3) #25 Frog hat.png',
       'Vibe Coding Assets (3) #25 frog hat.png',
@@ -861,6 +872,15 @@ function unlockAllAchievements() {
   renderAchievements();
 }
 
+function tryUseTopHatSafetyNet() {
+  if (selectedHat !== 'top') return false;
+  if (!topHatSafetyNetEnabled) return false;
+  if (coinBalance < TOP_HAT_SAFETY_NET_COST) return false;
+  coinBalance -= TOP_HAT_SAFETY_NET_COST;
+  updateCoinsHUD();
+  return true;
+}
+
 function updateSecretButtonVisibility() {
   if (!secretBtn) return;
   secretBtn.classList.toggle('hidden', !(secretUnlocked && secretAvailableAfterStart && gameState === 'playing'));
@@ -1274,7 +1294,7 @@ function renderShop() {
     const defaultHatColor = hat.color || '#ffffff';
     const hatTintColor = hasCustomHatColor
       ? hatColorOverrides[hat.id]
-      : (hat.id === 'top' ? null : defaultHatColor);
+      : (hat.id === 'top' || hat.id === 'frog' ? null : defaultHatColor);
     const previewLocked = hat.id !== 'none' && (!owned || achievementLocked);
 
     const previewEl = createHatPreview(hat.id, hatTintColor, previewLocked);
@@ -1357,6 +1377,27 @@ function renderShop() {
       renderShop();
     });
     card.appendChild(btn);
+
+    if (hat.id === 'top' && owned && !achievementLocked) {
+      const safetyWrap = document.createElement('div');
+      safetyWrap.className = 'top-hat-toggle-wrap';
+
+      const safetyInfo = document.createElement('p');
+      safetyInfo.className = 'top-hat-toggle-info';
+      safetyInfo.textContent = `Safety Net Cost: ${TOP_HAT_SAFETY_NET_COST} coins`;
+      safetyWrap.appendChild(safetyInfo);
+
+      const safetyToggleBtn = document.createElement('button');
+      safetyToggleBtn.className = 'top-hat-toggle-btn';
+      safetyToggleBtn.textContent = `Safety Net: ${topHatSafetyNetEnabled ? 'On' : 'Off'}`;
+      safetyToggleBtn.addEventListener('click', () => {
+        topHatSafetyNetEnabled = !topHatSafetyNetEnabled;
+        renderShop();
+      });
+      safetyWrap.appendChild(safetyToggleBtn);
+
+      card.appendChild(safetyWrap);
+    }
 
     shopItems.appendChild(card);
   });
@@ -1675,7 +1716,9 @@ function drawSpaceHazards() {
 function hitPlayer() {
   if (damageCooldown > 0) return;
   damageCooldown = 90;
-  lives -= 1;
+  if (!tryUseTopHatSafetyNet()) {
+    lives -= 1;
+  }
   if (lives <= 0) {
     endGuidedTutorial();
     gameState = 'death';
@@ -2665,6 +2708,8 @@ function loadAssets(basePath = 'assets') {
     loadFirstPaths([
       spriteFilePaths.hats.frog,
       `${basePath}/${spriteFilePaths.hats.frog}`,
+      'Vibe Coding Assets (3) #25 Frog Hat.png',
+      `${basePath}/Vibe Coding Assets (3) #25 Frog Hat.png`,
     ]).then((i) => (assets.hatFrog = i)),
     loadFirstPaths([
       spriteFilePaths.hats.straw,
@@ -3297,6 +3342,18 @@ function applyPhysics() {
 
   coins.forEach((coin) => {
     if (coin.collected) return;
+    if (selectedHat === 'top') {
+      const px = player.x + player.width / 2;
+      const py = player.y + player.height / 2;
+      const dx = px - coin.x;
+      const dy = py - coin.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0 && dist < TOP_HAT_COIN_MAGNET_RADIUS) {
+        const strength = (1 - (dist / TOP_HAT_COIN_MAGNET_RADIUS)) * TOP_HAT_COIN_MAGNET_PULL;
+        coin.x += dx * strength;
+        coin.y += dy * strength;
+      }
+    }
     const overlapX = Math.abs((player.x + player.width / 2) - coin.x) < (player.width / 2 + 7);
     const overlapY = Math.abs((player.y + player.height / 2) - coin.y) < (player.height / 2 + 7);
     if (overlapX && overlapY) {
@@ -3311,8 +3368,9 @@ function applyPhysics() {
   });
 
   const scale = Math.max(1.0, HEIGHT / 900);
-  const groundJump = -19.8 * scale;
-  const airJump = -17.9 * scale;
+  const frogJumpMultiplier = selectedHat === 'frog' ? 1.55 : 1;
+  const groundJump = -19.8 * scale * frogJumpMultiplier;
+  const airJump = -17.9 * scale * frogJumpMultiplier;
   if (keys.jump) jumpBufferFrames = 7;
   if ((player.onGround || coyoteFrames > 0) && jumpBufferFrames > 0) {
     player.vy = groundJump;
