@@ -39,6 +39,7 @@ const mobileDown = document.getElementById('mobileDown');
 const mobileJump = document.getElementById('mobileJump');
 const shopBtn = document.getElementById('shopBtn');
 const achievementsBtn = document.getElementById('achievementsBtn');
+const leaderboardBtn = document.getElementById('leaderboardBtn');
 const hudIntroBtn = document.getElementById('hudIntroBtn');
 const hudToggleBtn = document.getElementById('hudToggleBtn');
 const hudRight = document.getElementById('hudRight');
@@ -50,6 +51,18 @@ const shopCloseBtn = document.getElementById('shopCloseBtn');
 const achievementsOverlay = document.getElementById('achievementsOverlay');
 const achievementsList = document.getElementById('achievementsList');
 const achievementsCloseBtn = document.getElementById('achievementsCloseBtn');
+const leaderboardOverlay = document.getElementById('leaderboardOverlay');
+const leaderboardMeta = document.getElementById('leaderboardMeta');
+const leaderboardList = document.getElementById('leaderboardList');
+const leaderboardCloseBtn = document.getElementById('leaderboardCloseBtn');
+const namePromptOverlay = document.getElementById('namePromptOverlay');
+const playerNameInput = document.getElementById('playerNameInput');
+const playerPasswordInput = document.getElementById('playerPasswordInput');
+const playerNameConfirmBtn = document.getElementById('playerNameConfirmBtn');
+const playerNameCancelBtn = document.getElementById('playerNameCancelBtn');
+const playerNameError = document.getElementById('playerNameError');
+const authLoginModeBtn = document.getElementById('authLoginModeBtn');
+const authSignupModeBtn = document.getElementById('authSignupModeBtn');
 const titleHeading = document.getElementById('titleHeading');
 const secretBtn = document.getElementById('secretBtn');
 const secretRainLayer = document.getElementById('secretRainLayer');
@@ -135,6 +148,7 @@ const assets = {
   hatChef: null,
   hatCowboy: null,
   hatStraw: null,
+  hatFrog: null,
   grassSmall: null,
   grassMedium: null,
   grassLarge: null,
@@ -167,12 +181,38 @@ let hudRightButtonsCollapsed = false;
 const unlockedAchievements = new Set();
 const pendingAchievementQueue = [];
 const hatColorOverrides = {};
+let playerName = '';
+let hasConfirmedPlayerName = false;
+let authMode = 'login';
+let currentAccountKey = '';
+let pendingStartAction = null;
+let leaderboardRecords = [];
+let totalJumps = 0;
 const maskedHatSpriteCache = new Map();
 const grayscaleHatSpriteCache = new Map();
 const tintedHatSpriteCache = new Map();
-const SAVE_STORAGE_KEY = 'project2_2_saved_progress_v1';
+const ACCOUNT_STORAGE_KEY = 'project2_2_accounts_v1';
+// Rotated to v2 to clear previous test leaderboard entries.
+const LEADERBOARD_STORAGE_KEY = 'project2_2_leaderboard_v2';
+let accountStore = {};
+const BLOCKED_LEADERBOARD_NAMES = new Set(['osj']);
 
 const achievementCatalog = {
+  jump_first: {
+    name: 'Boing Beginner',
+    description: 'Perform your first jump.',
+    isUnlocked: () => totalJumps >= 1,
+  },
+  jump_100: {
+    name: 'Sky Hopper',
+    description: 'Perform 100 jumps.',
+    isUnlocked: () => totalJumps >= 100,
+  },
+  jump_1000: {
+    name: 'Frog Mode',
+    description: 'Perform 1000 jumps.',
+    isUnlocked: () => totalJumps >= 1000,
+  },
   first_coin: {
     name: 'First Shiny',
     description: 'Collect your first coin.',
@@ -206,17 +246,17 @@ const achievementCatalog = {
   hat_collector: {
     name: 'Catwalk Ready',
     description: 'Buy/Earn your first hat.',
-    isUnlocked: () => unlockedHats.size > 1,
+    isUnlocked: () => getOwnedHatCount() >= 1,
   },
   hat_trio: {
     name: 'Hat Trick',
     description: 'Buy/Earn 3 hats.',
-    isUnlocked: () => Array.from(unlockedHats).filter((h) => h !== 'none').length >= 3,
+    isUnlocked: () => getOwnedHatCount() >= 3,
   },
   hat_master: {
     name: 'Full Closet',
     description: 'Buy/Earn all hats.',
-    isUnlocked: () => Array.from(unlockedHats).filter((h) => h !== 'none').length >= (hatCatalog.length - 1),
+    isUnlocked: () => getOwnedHatCount() >= (hatCatalog.length - 1),
   },
   secret_found: {
     name: 'Admin Pawnel',
@@ -224,6 +264,14 @@ const achievementCatalog = {
     isUnlocked: () => secretUnlocked,
   },
 };
+
+const achievementSections = [
+  { title: 'Space', ids: ['first_win', 'triple_top', 'crown_unlock'] },
+  { title: 'Jumps', ids: ['jump_first', 'jump_100', 'jump_1000'] },
+  { title: 'Coins', ids: ['first_coin', 'coin_centurion', 'coin_hoarder'] },
+  { title: 'Hats', ids: ['hat_collector', 'hat_trio', 'hat_master'] },
+  { title: 'Specialized Achievements', ids: ['secret_found'] },
+];
 
 const tutorialSteps = [
   {
@@ -287,6 +335,7 @@ const hatCatalog = [
   { id: 'straw', label: 'Straw Hat', cost: 20, color: '#d5b75a' },
   { id: 'cowboy', label: 'Cowboy Hat', cost: 25, color: '#b5854e' },
   { id: 'wizard', label: 'Wizard Hat', cost: 30, color: '#7f79df' },
+  { id: 'frog', label: 'Frog Hat', cost: 0, color: '#61b94e', unlockType: 'achievement', requiredAchievement: 'jump_1000' },
   { id: 'top', label: 'Top Hat', cost: 0, color: '#1e1f2b', unlockType: 'achievement', requiredAchievement: 'coin_hoarder' },
   { id: 'crown', label: 'Crown', cost: 0, color: '#f4ce46', unlockType: 'spaceWins', requiredWins: 10 },
 ];
@@ -303,6 +352,7 @@ const spriteFilePaths = {
     top: 'Vibe Coding Assets (3) #22 Top Hat.png',
     chef: 'Vibe Coding Assets (3) #23 Chef Hat.png',
     cowboy: 'Vibe Coding Assets (3) #24 Cowboy Hat.png',
+    frog: 'Vibe Coding Assets (3) #25 Frog Hat.png',
   },
 };
 
@@ -314,11 +364,86 @@ function getHatSpritePath(hatId) {
   return spriteFilePaths.hats[hatId] || null;
 }
 
+function getHatById(hatId) {
+  return hatCatalog.find((hat) => hat.id === hatId) || null;
+}
+
+function isHatOwned(hatId) {
+  if (hatId === 'none') return true;
+  const hat = getHatById(hatId);
+  if (!hat) return false;
+  if (unlockedHats.has(hatId)) return true;
+  if (hat.unlockType === 'spaceWins') {
+    return spaceWins >= (hat.requiredWins || 0);
+  }
+  if (hat.unlockType === 'achievement') {
+    return unlockedAchievements.has(hat.requiredAchievement || '');
+  }
+  return false;
+}
+
+function getOwnedHatCount() {
+  return hatCatalog.reduce((count, hat) => {
+    if (hat.id === 'none') return count;
+    return count + (isHatOwned(hat.id) ? 1 : 0);
+  }, 0);
+}
+
+function getHatPreviewImageSource(hatId) {
+  if (hatId === 'cap' && assets.hatCap && assets.hatCap.src) return assets.hatCap.src;
+  if (hatId === 'party' && assets.hatParty && assets.hatParty.src) return assets.hatParty.src;
+  if (hatId === 'crown' && assets.hatCrown && assets.hatCrown.src) return assets.hatCrown.src;
+  if (hatId === 'wizard' && assets.hatWitch && assets.hatWitch.src) return assets.hatWitch.src;
+  if (hatId === 'frog' && assets.hatFrog && assets.hatFrog.src) return assets.hatFrog.src;
+  if (hatId === 'top' && assets.hatTop && assets.hatTop.src) return assets.hatTop.src;
+  if (hatId === 'chef' && assets.hatChef && assets.hatChef.src) return assets.hatChef.src;
+  if (hatId === 'cowboy' && assets.hatCowboy && assets.hatCowboy.src) return assets.hatCowboy.src;
+  if (hatId === 'straw' && assets.hatStraw && assets.hatStraw.src) return assets.hatStraw.src;
+
+  const spritePath = getHatSpritePath(hatId);
+  if (!spritePath) return null;
+  return encodeAssetPath(spritePath);
+}
+
+function getHatPreviewImageCandidates(hatId) {
+  const spritePath = getHatSpritePath(hatId);
+  if (!spritePath) return [];
+
+  const preferred = getHatPreviewImageSource(hatId);
+  const candidates = [
+    preferred,
+    encodeAssetPath(spritePath),
+    spritePath,
+    encodeAssetPath(`assets/${spritePath}`),
+    `assets/${spritePath}`,
+    encodeAssetPath(`Assets/${spritePath}`),
+    `Assets/${spritePath}`,
+  ];
+
+  if (hatId === 'frog') {
+    const frogVariants = [
+      'Vibe Coding Assets (3) #25 Frog Hat.png',
+      'Vibe Coding Assets (3) #25 Frog hat.png',
+      'Vibe Coding Assets (3) #25 frog hat.png',
+      'assets/Vibe Coding Assets (3) #25 Frog Hat.png',
+      'assets/Vibe Coding Assets (3) #25 Frog hat.png',
+      'Assets/Vibe Coding Assets (3) #25 Frog Hat.png',
+      'Assets/Vibe Coding Assets (3) #25 Frog hat.png',
+    ];
+    frogVariants.forEach((src) => {
+      candidates.push(src, encodeAssetPath(src));
+    });
+  }
+
+  return [...new Set(candidates.filter(Boolean))];
+}
+
 function getSelectedHatSprite() {
   if (selectedHat === 'cap') return assets.hatCap;
   if (selectedHat === 'party') return assets.hatParty;
   if (selectedHat === 'crown') return assets.hatCrown;
   if (selectedHat === 'wizard') return assets.hatWitch;
+  if (selectedHat === 'frog') return assets.hatFrog;
   if (selectedHat === 'top') return assets.hatTop;
   if (selectedHat === 'chef') return assets.hatChef;
   if (selectedHat === 'cowboy') return assets.hatCowboy;
@@ -495,6 +620,28 @@ function getHatPlacement(hatId) {
   }
   if (hatId === 'wizard') {
     return { widthRatio: 0.78, heightRatio: 0.46, xOffset: 0.135, bottomYRatio: 0.21 };
+  }
+  if (hatId === 'frog') {
+    return {
+      widthRatio: 0.72,
+      heightRatio: 0.48,
+      xOffset: 0.13,
+      bottomYRatio: 0.21,
+      walkXOffset: 0.16,
+      walkBottomYRatio: 0.245,
+      crouchXOffset: 0.19,
+      crouchBottomYRatio: 0.32,
+      sitXOffset: 0.14,
+      sitBottomYRatio: 0.24,
+      standFineNudgePx: 8,
+      walkFineNudgePx: 6,
+      crouchFineNudgePx: 4,
+      sitFineNudgePx: 7,
+      standFineYNudgePx: -1,
+      walkFineYNudgePx: 1,
+      crouchFineYNudgePx: 2,
+      sitFineYNudgePx: 0,
+    };
   }
   if (hatId === 'top') {
     return {
@@ -697,6 +844,7 @@ function unlockAllHats() {
   unlockedHats.add('top');
   unlockedHats.add('crown');
   unlockedHats.add('wizard');
+  unlockedHats.add('frog');
   coinBalance = Math.max(coinBalance, 1000);
   spaceWins = 10;
   unlockAchievementsByState(false);
@@ -852,6 +1000,7 @@ function applyPixelRenderSettings() {
 function showWarningModal(title, message, onConfirm) {
   closeAchievements();
   closeShop();
+  closeLeaderboard();
   warningAction = onConfirm;
   if (warningTitle) warningTitle.textContent = title;
   if (warningMessage) warningMessage.textContent = message;
@@ -966,6 +1115,7 @@ function endGuidedTutorial() {
 function startGuidedTutorial() {
   hideWarningModal();
   closeShop();
+  closeLeaderboard();
   setHudRightButtonsCollapsed(false);
   showScreen('none');
   if (gameState !== 'playing') {
@@ -998,6 +1148,7 @@ function previousTutorialStep() {
 function updateCoinsHUD() {
   if (coinsText) coinsText.textContent = `Coins: ${coinBalance}`;
   if (shopCoins) shopCoins.textContent = `Coins: ${coinBalance}`;
+  updateLeaderboardForCurrentPlayer();
 }
 
 function createHatPreview(hatId, tintColor = null, isLocked = false) {
@@ -1006,16 +1157,58 @@ function createHatPreview(hatId, tintColor = null, isLocked = false) {
 
   const spritePath = getHatSpritePath(hatId);
   if (spritePath) {
-    const encodedSpritePath = encodeAssetPath(spritePath);
+    const previewSources = getHatPreviewImageCandidates(hatId);
     const img = document.createElement('img');
     img.className = 'hat-preview-image';
     img.alt = `${hatId} hat`;
-    img.src = encodedSpritePath;
-    preview.appendChild(img);
+    const missing = document.createElement('div');
+    missing.className = 'hat-preview-missing';
+    missing.textContent = 'Image failed to load';
     const tint = document.createElement('div');
     tint.className = 'hat-preview-tint';
-    tint.style.setProperty('--hat-mask-url', `url("${encodedSpritePath}")`);
+
+    const updateMask = (src) => {
+      tint.style.setProperty('--hat-mask-url', `url("${src}")`);
+    };
+
+    let sourceIndex = 0;
+    const applySource = () => {
+      if (sourceIndex < 0 || sourceIndex >= previewSources.length) return;
+      const nextSrc = previewSources[sourceIndex];
+      img.src = nextSrc;
+      updateMask(nextSrc);
+    };
+
+    img.addEventListener('load', () => {
+      updateMask(img.currentSrc || img.src);
+      img.classList.remove('hat-preview-image-hidden');
+      missing.classList.remove('active');
+      tint.classList.remove('hidden');
+    });
+    img.addEventListener('error', () => {
+      sourceIndex += 1;
+      if (sourceIndex < previewSources.length) {
+        applySource();
+        return;
+      }
+      img.classList.add('hat-preview-image-hidden');
+      tint.classList.add('hidden');
+      missing.classList.add('active');
+    });
+
+    preview.appendChild(img);
+    tint.style.setProperty('--hat-mask-url', previewSources[0] ? `url("${previewSources[0]}")` : 'none');
     preview.appendChild(tint);
+    preview.appendChild(missing);
+
+    if (previewSources.length > 0) {
+      applySource();
+    } else {
+      img.classList.add('hat-preview-image-hidden');
+      tint.classList.add('hidden');
+      missing.classList.add('active');
+    }
+
     if (isLocked) preview.classList.add('hat-preview-locked-sprite');
     if (tintColor) {
       preview.style.setProperty('--hat-tint', tintColor);
@@ -1075,8 +1268,7 @@ function renderShop() {
       (hat.unlockType === 'spaceWins' && spaceWins < (hat.requiredWins || 0))
       || (hat.unlockType === 'achievement' && !unlockedAchievements.has(hat.requiredAchievement || ''))
     );
-    const achievementOwned = hat.unlockType === 'achievement' && unlockedAchievements.has(hat.requiredAchievement || '');
-    const owned = unlockedHats.has(hat.id) || achievementOwned;
+    const owned = isHatOwned(hat.id);
     const selected = selectedHat === hat.id;
     const hasCustomHatColor = Object.prototype.hasOwnProperty.call(hatColorOverrides, hat.id);
     const defaultHatColor = hat.color || '#ffffff';
@@ -1149,7 +1341,7 @@ function renderShop() {
     }
     btn.addEventListener('click', () => {
       if (achievementLocked) return;
-      const hasHat = unlockedHats.has(hat.id) || (hat.unlockType === 'achievement' && unlockedAchievements.has(hat.requiredAchievement || ''));
+      const hasHat = isHatOwned(hat.id);
       if (!hasHat && coinBalance < hat.cost) {
         showWarningModal('Insufficient Funds', 'Insufficient Funds', () => {});
         return;
@@ -1171,17 +1363,20 @@ function renderShop() {
 }
 
 function getAchievementCardStatus(id, achievement) {
+  if (id === 'jump_first') return `${Math.min(totalJumps, 1)}/1`;
+  if (id === 'jump_100') return `${Math.min(totalJumps, 100)}/100`;
+  if (id === 'jump_1000') return `${Math.min(totalJumps, 1000)}/1000`;
   if (id === 'first_coin') return `${Math.min(coinBalance, 1)}/1`;
   if (id === 'coin_hoarder') return `${Math.min(coinBalance, 1000)}/1000`;
   if (id === 'coin_centurion') return `${Math.min(coinBalance, 100)}/100`;
   if (id === 'first_win') return `${Math.min(spaceWins, 1)}/1`;
   if (id === 'triple_top') return `${Math.min(spaceWins, 3)}/3`;
   if (id === 'crown_unlock') return `${Math.min(spaceWins, 10)}/10`;
-  if (id === 'hat_collector') return Array.from(unlockedHats).filter((h) => h !== 'none').length >= 1 ? 'Done' : '0/1';
-  if (id === 'hat_trio') return `${Math.min(Array.from(unlockedHats).filter((h) => h !== 'none').length, 3)}/3`;
+  if (id === 'hat_collector') return getOwnedHatCount() >= 1 ? 'Done' : '0/1';
+  if (id === 'hat_trio') return `${Math.min(getOwnedHatCount(), 3)}/3`;
   if (id === 'hat_master') {
     const maxHats = Math.max(1, hatCatalog.length - 1);
-    const ownedHats = Array.from(unlockedHats).filter((h) => h !== 'none').length;
+    const ownedHats = getOwnedHatCount();
     return `${Math.min(ownedHats, maxHats)}/${maxHats}`;
   }
   if (id === 'secret_found') return secretUnlocked ? 'Done' : 'Locked';
@@ -1191,27 +1386,45 @@ function getAchievementCardStatus(id, achievement) {
 function renderAchievements() {
   if (!achievementsList) return;
   achievementsList.innerHTML = '';
-  Object.entries(achievementCatalog).forEach(([id, achievement]) => {
-    const unlocked = unlockedAchievements.has(id);
-    const card = document.createElement('div');
-    card.className = `achievement-card${unlocked ? '' : ' locked'}`;
+  achievementSections.forEach((section) => {
+    const sectionWrap = document.createElement('section');
+    sectionWrap.className = 'achievement-section';
 
-    const title = document.createElement('h3');
-    title.textContent = achievement.name;
-    card.appendChild(title);
+    const sectionTitle = document.createElement('h3');
+    sectionTitle.className = 'achievement-section-title';
+    sectionTitle.textContent = section.title;
+    sectionWrap.appendChild(sectionTitle);
 
-    const desc = document.createElement('p');
-    desc.textContent = achievement.description;
-    card.appendChild(desc);
+    const row = document.createElement('div');
+    row.className = 'achievement-row';
 
-    const status = document.createElement('div');
-    status.className = 'achievement-card-status';
-    status.textContent = unlocked
-      ? 'Unlocked'
-      : `Progress: ${getAchievementCardStatus(id, achievement)}`;
-    card.appendChild(status);
+    section.ids.forEach((id) => {
+      const achievement = achievementCatalog[id];
+      if (!achievement) return;
+      const unlocked = unlockedAchievements.has(id);
+      const card = document.createElement('div');
+      card.className = `achievement-card${unlocked ? '' : ' locked'}`;
 
-    achievementsList.appendChild(card);
+      const title = document.createElement('h3');
+      title.textContent = achievement.name;
+      card.appendChild(title);
+
+      const desc = document.createElement('p');
+      desc.textContent = achievement.description;
+      card.appendChild(desc);
+
+      const status = document.createElement('div');
+      status.className = 'achievement-card-status';
+      status.textContent = unlocked
+        ? 'Unlocked'
+        : `Progress: ${getAchievementCardStatus(id, achievement)}`;
+      card.appendChild(status);
+
+      row.appendChild(card);
+    });
+
+    sectionWrap.appendChild(row);
+    achievementsList.appendChild(sectionWrap);
   });
 }
 
@@ -1219,6 +1432,7 @@ function openAchievements() {
   if (!achievementsOverlay) return;
   hideWarningModal();
   closeShop();
+  closeLeaderboard();
   renderAchievements();
   achievementsOverlay.classList.remove('hidden');
   achievementsOverlay.classList.add('active');
@@ -1234,6 +1448,7 @@ function openShop() {
   if (!shopOverlay) return;
   hideWarningModal();
   closeAchievements();
+  closeLeaderboard();
   renderShop();
   updateCoinsHUD();
   shopOverlay.classList.remove('hidden');
@@ -1263,16 +1478,21 @@ function drawHatAt(x, y, w, h, posture = null) {
     const placement = getHatPlacement(selectedHat);
     const crouchOrCrawl = !!(posture && posture.isCrouching);
     const walking = !!(posture && posture.isWalking) && !crouchOrCrawl;
+    const sitting = !!(posture && posture.isSitting) && !walking && !crouchOrCrawl;
     const xOffsetRatio = crouchOrCrawl
       ? (placement.crouchXOffset ?? (placement.xOffset + 0.085))
       : walking
         ? (placement.walkXOffset ?? placement.xOffset)
-      : placement.xOffset;
+        : sitting
+          ? (placement.sitXOffset ?? placement.xOffset)
+          : placement.xOffset;
     const bottomYRatio = crouchOrCrawl
       ? (placement.crouchBottomYRatio ?? (placement.bottomYRatio + 0.11))
       : walking
         ? (placement.walkBottomYRatio ?? placement.bottomYRatio)
-      : placement.bottomYRatio;
+        : sitting
+          ? (placement.sitBottomYRatio ?? placement.bottomYRatio)
+          : placement.bottomYRatio;
     const maxW = Math.round(w * placement.widthRatio);
     const maxH = Math.round(h * placement.heightRatio);
     const scale = Math.min(maxW / sourceSw, maxH / sourceSh);
@@ -1296,6 +1516,12 @@ function drawHatAt(x, y, w, h, posture = null) {
         : Number.isFinite(placement.standFineNudgePx)
           ? placement.standFineNudgePx
           : 0;
+    } else if (sitting) {
+      fineNudgePx = Number.isFinite(placement.sitFineNudgePx)
+        ? placement.sitFineNudgePx
+        : Number.isFinite(placement.standFineNudgePx)
+          ? placement.standFineNudgePx
+          : 0;
     } else {
       fineNudgePx = Number.isFinite(placement.standFineNudgePx)
         ? placement.standFineNudgePx
@@ -1310,7 +1536,9 @@ function drawHatAt(x, y, w, h, posture = null) {
       ? (placement.crouchFineYNudgePx ?? 0)
       : walking
         ? (placement.walkFineYNudgePx ?? 0)
-        : (placement.standFineYNudgePx ?? 0);
+        : sitting
+          ? (placement.sitFineYNudgePx ?? (placement.standFineYNudgePx ?? 0))
+          : (placement.standFineYNudgePx ?? 0);
     if (Number.isFinite(yNudgePx)) {
       drawY += Math.round(spritePixelScale * yNudgePx);
     }
@@ -1466,7 +1694,15 @@ function hitPlayer() {
 function setMobileControlsVisibility() {
   if (!mobileControls) return;
   const isTouchLike = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+  const compactPortrait = isTouchLike && isPortrait;
   mobileControls.classList.toggle('hidden', !isTouchLike);
+  mobileControls.classList.toggle('compact-portrait', compactPortrait);
+
+  // Keep action buttons out of the way on narrow touch screens.
+  if (isTouchLike) {
+    setHudRightButtonsCollapsed(compactPortrait);
+  }
 }
 
 function bindMobileControl(buttonEl, onDown, onUp) {
@@ -1539,43 +1775,444 @@ function canUseLocalStorage() {
   }
 }
 
-function writePersistentProgress() {
-  if (!savedProgress || !canUseLocalStorage()) return;
-  try {
-    window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(savedProgress));
-  } catch {
-    // Ignore storage write failures (private mode, quota, blocked storage).
+function sanitizePlayerName(name) {
+  if (typeof name !== 'string') return '';
+  return name.replace(/\s+/g, ' ').trim().slice(0, 24);
+}
+
+function normalizeForModeration(name) {
+  if (typeof name !== 'string') return '';
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const blockedUsernameTerms = [
+  'fuck',
+  'fucking',
+  'shit',
+  'bitch',
+  'cunt',
+  'nigger',
+  'nigga',
+  'retard',
+  'fag',
+  'faggot',
+  'slut',
+  'whore',
+  'porn',
+  'sex',
+  'penis',
+  'vagina',
+  'dick',
+  'pussy',
+  'rape',
+  'naz',
+  'hitler',
+  'kkk',
+  'suicide',
+  'killyourself',
+  'terrorist',
+];
+
+function getUsernameValidationError(name) {
+  const safeName = sanitizePlayerName(name);
+  if (!safeName) return 'Please enter a valid username.';
+  if (safeName.length < 1) return 'Username must be at least 1 character.';
+
+  const allowedPattern = /^[A-Za-z0-9 _.:()-]+$/;
+  if (!allowedPattern.test(safeName)) {
+    return 'Username can only use letters, numbers, spaces, ., -, _, (, ), and :.';
   }
+
+  const normalized = normalizeForModeration(safeName);
+  if (normalized) {
+    const hasBlockedTerm = blockedUsernameTerms.some((term) => normalized.includes(term));
+    if (hasBlockedTerm) {
+      return 'That username is not allowed. Please choose another.';
+    }
+
+    const repeatedCharPattern = /(.)\1{5,}/;
+    if (repeatedCharPattern.test(normalized)) {
+      return 'Please choose a less spammy username.';
+    }
+  }
+
+  return '';
+}
+
+function normalizePlayerName(name) {
+  return sanitizePlayerName(name).toLowerCase();
+}
+
+function hashPassword(password) {
+  let hash = 5381;
+  const text = String(password || '');
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) + hash) ^ text.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function loadAccountStore() {
+  accountStore = {};
+  if (!canUseLocalStorage()) return;
+  try {
+    const raw = window.localStorage.getItem(ACCOUNT_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    Object.entries(parsed).forEach(([key, record]) => {
+      if (!record || typeof record !== 'object') return;
+      const safeName = sanitizePlayerName(record.playerName || record.name || '');
+      if (!safeName) return;
+      const normalized = normalizePlayerName(safeName);
+      accountStore[normalized] = {
+        playerName: safeName,
+        passwordHash: String(record.passwordHash || ''),
+        progress: record.progress && typeof record.progress === 'object' ? record.progress : null,
+      };
+    });
+  } catch {
+    accountStore = {};
+  }
+}
+
+function saveAccountStore() {
+  if (!canUseLocalStorage()) return;
+  try {
+    window.localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(accountStore));
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
+function getAccountRecordByName(name) {
+  const normalized = normalizePlayerName(name);
+  if (!normalized) return null;
+  return accountStore[normalized] || null;
+}
+
+function writePersistentProgress() {
+  if (!savedProgress || !currentAccountKey || !accountStore[currentAccountKey]) return;
+  accountStore[currentAccountKey].progress = savedProgress;
+  saveAccountStore();
 }
 
 function loadPersistentProgress() {
-  if (!canUseLocalStorage()) return null;
-  try {
-    const raw = window.localStorage.getItem(SAVE_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  if (!currentAccountKey) return null;
+  const account = accountStore[currentAccountKey];
+  if (!account || !account.progress || typeof account.progress !== 'object') return null;
+  return account.progress;
 }
 
 function clearPersistentProgress() {
-  if (!canUseLocalStorage()) return;
+  if (!currentAccountKey || !accountStore[currentAccountKey]) return;
+  accountStore[currentAccountKey].progress = null;
+  saveAccountStore();
+}
+
+function setCurrentAccountByName(name) {
+  const normalized = normalizePlayerName(name);
+  if (!normalized || !accountStore[normalized]) return false;
+  currentAccountKey = normalized;
+  playerName = accountStore[normalized].playerName;
+  hasConfirmedPlayerName = true;
+  return true;
+}
+
+function logoutCurrentAccount() {
+  currentAccountKey = '';
+  playerName = '';
+  hasConfirmedPlayerName = false;
+  savedProgress = null;
+}
+
+function createAccount(name, password) {
+  const safeName = sanitizePlayerName(name);
+  const usernameError = getUsernameValidationError(safeName);
+  if (usernameError) return { ok: false, message: usernameError };
+  const normalized = normalizePlayerName(safeName);
+  if (!safeName || !normalized) return { ok: false, message: 'Please enter a valid username.' };
+  if (accountStore[normalized]) return { ok: false, message: 'That username is already taken.' };
+  if (typeof password !== 'string' || password.length < 5) {
+    return { ok: false, message: 'Password must be at least 5 characters.' };
+  }
+  accountStore[normalized] = {
+    playerName: safeName,
+    passwordHash: hashPassword(password),
+    progress: null,
+  };
+  saveAccountStore();
+  setCurrentAccountByName(safeName);
+  return { ok: true };
+}
+
+function loginAccount(name, password) {
+  const safeName = sanitizePlayerName(name);
+  const usernameError = getUsernameValidationError(safeName);
+  if (usernameError) return { ok: false, message: usernameError };
+  const account = getAccountRecordByName(safeName);
+  if (!account) return { ok: false, message: 'No account found for that username.' };
+  if (account.passwordHash !== hashPassword(password)) {
+    return { ok: false, message: 'Incorrect password.' };
+  }
+  setCurrentAccountByName(account.playerName);
+  return { ok: true };
+}
+
+function loadLeaderboardData() {
+  if (!canUseLocalStorage()) {
+    leaderboardRecords = [];
+    return;
+  }
   try {
-    window.localStorage.removeItem(SAVE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+    if (!raw) {
+      leaderboardRecords = [];
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      leaderboardRecords = [];
+      return;
+    }
+    leaderboardRecords = parsed
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => ({
+        name: sanitizePlayerName(entry.name || ''),
+        wins: Math.max(0, Math.floor(Number(entry.wins) || 0)),
+        coins: Math.max(0, Math.floor(Number(entry.coins) || 0)),
+        updatedAt: Number(entry.updatedAt) || Date.now(),
+      }))
+      .filter((entry) => {
+        if (!entry.name) return false;
+        return !BLOCKED_LEADERBOARD_NAMES.has(entry.name.toLowerCase());
+      });
+    saveLeaderboardData();
   } catch {
-    // Ignore storage delete failures.
+    leaderboardRecords = [];
   }
 }
 
+function saveLeaderboardData() {
+  if (!canUseLocalStorage()) return;
+  leaderboardRecords = leaderboardRecords.filter((entry) => {
+    if (!entry || !entry.name) return false;
+    return !BLOCKED_LEADERBOARD_NAMES.has(String(entry.name).toLowerCase());
+  });
+  try {
+    window.localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(leaderboardRecords));
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
+function updateLeaderboardForCurrentPlayer(winsValue = spaceWins, coinsValue = coinBalance, nameValue = playerName) {
+  if (!hasConfirmedPlayerName) return;
+  const safeName = sanitizePlayerName(nameValue);
+  if (!safeName) return;
+  const normalized = safeName.toLowerCase();
+  if (!normalized) return;
+  const now = Date.now();
+  const existing = leaderboardRecords.find((entry) => entry.name.toLowerCase() === normalized);
+  const safeWins = Math.max(0, Math.floor(Number(winsValue) || 0));
+  const safeCoins = Math.max(0, Math.floor(Number(coinsValue) || 0));
+  if (existing) {
+    existing.name = safeName;
+    existing.wins = Math.max(existing.wins, safeWins);
+    existing.coins = Math.max(existing.coins, safeCoins);
+    existing.updatedAt = now;
+  } else {
+    leaderboardRecords.push({
+      name: safeName,
+      wins: safeWins,
+      coins: safeCoins,
+      updatedAt: now,
+    });
+  }
+
+  leaderboardRecords.sort((a, b) => {
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    if (b.coins !== a.coins) return b.coins - a.coins;
+    if (a.updatedAt !== b.updatedAt) return a.updatedAt - b.updatedAt;
+    return a.name.localeCompare(b.name);
+  });
+  leaderboardRecords = leaderboardRecords.slice(0, 25);
+  saveLeaderboardData();
+}
+
+function renderLeaderboard() {
+  if (!leaderboardList || !leaderboardMeta) return;
+  updateLeaderboardForCurrentPlayer();
+  leaderboardList.innerHTML = '';
+  leaderboardMeta.textContent = playerName
+    ? `Player: ${playerName}`
+    : 'No player name set yet.';
+
+  if (leaderboardRecords.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'leaderboard-empty';
+    empty.textContent = 'No entries yet. Start playing to add scores.';
+    leaderboardList.appendChild(empty);
+    return;
+  }
+
+  leaderboardRecords.forEach((entry, idx) => {
+    const row = document.createElement('div');
+    row.className = 'leaderboard-entry';
+
+    const rank = document.createElement('div');
+    rank.className = 'leaderboard-rank';
+    rank.textContent = `#${idx + 1}`;
+
+    const name = document.createElement('div');
+    name.className = 'leaderboard-name';
+    name.textContent = entry.name;
+
+    const wins = document.createElement('div');
+    wins.className = 'leaderboard-stat';
+    wins.textContent = `Wins: ${entry.wins}`;
+
+    const coinsTextNode = document.createElement('div');
+    coinsTextNode.className = 'leaderboard-stat';
+    coinsTextNode.textContent = `Coins: ${entry.coins}`;
+
+    row.append(rank, name, wins, coinsTextNode);
+    leaderboardList.appendChild(row);
+  });
+}
+
+function openLeaderboard() {
+  if (!leaderboardOverlay) return;
+  hideWarningModal();
+  closeShop();
+  closeAchievements();
+  renderLeaderboard();
+  leaderboardOverlay.classList.remove('hidden');
+  leaderboardOverlay.classList.add('active');
+}
+
+function closeLeaderboard() {
+  if (!leaderboardOverlay) return;
+  leaderboardOverlay.classList.add('hidden');
+  leaderboardOverlay.classList.remove('active');
+}
+
+function showNamePrompt(onConfirm) {
+  if (!namePromptOverlay) {
+    if (typeof onConfirm === 'function') onConfirm();
+    return;
+  }
+  closeShop();
+  closeAchievements();
+  closeLeaderboard();
+  hideWarningModal();
+  pendingStartAction = typeof onConfirm === 'function' ? onConfirm : null;
+  if (playerNameError) {
+    playerNameError.style.color = '#ffd68f';
+    playerNameError.textContent = '';
+  }
+  if (authLoginModeBtn && authSignupModeBtn) {
+    authLoginModeBtn.classList.toggle('active', authMode === 'login');
+    authSignupModeBtn.classList.toggle('active', authMode === 'signup');
+  }
+  if (playerNameInput) {
+    playerNameInput.value = playerName;
+  }
+  if (playerPasswordInput) {
+    playerPasswordInput.value = '';
+    playerPasswordInput.setAttribute('autocomplete', authMode === 'signup' ? 'new-password' : 'current-password');
+  }
+  namePromptOverlay.classList.remove('hidden');
+  namePromptOverlay.classList.add('active');
+  if (playerNameInput) {
+    playerNameInput.focus();
+    playerNameInput.select();
+  }
+}
+
+function hideNamePrompt() {
+  if (!namePromptOverlay) return;
+  namePromptOverlay.classList.add('hidden');
+  namePromptOverlay.classList.remove('active');
+}
+
+function cancelPlayerNamePrompt() {
+  pendingStartAction = null;
+  if (playerNameError) {
+    playerNameError.style.color = '#ffd68f';
+    playerNameError.textContent = '';
+  }
+  hideNamePrompt();
+}
+
+function setAuthMode(mode) {
+  authMode = mode === 'signup' ? 'signup' : 'login';
+  if (authLoginModeBtn && authSignupModeBtn) {
+    authLoginModeBtn.classList.toggle('active', authMode === 'login');
+    authSignupModeBtn.classList.toggle('active', authMode === 'signup');
+  }
+  if (playerPasswordInput) {
+    playerPasswordInput.setAttribute('autocomplete', authMode === 'signup' ? 'new-password' : 'current-password');
+  }
+  if (playerNameError) {
+    playerNameError.style.color = '#ffd68f';
+    playerNameError.textContent = '';
+  }
+}
+
+function ensurePlayerNameBefore(onConfirm) {
+  if (hasConfirmedPlayerName && currentAccountKey && sanitizePlayerName(playerName)) {
+    if (typeof onConfirm === 'function') onConfirm();
+    return;
+  }
+  showNamePrompt(onConfirm);
+}
+
+function confirmPlayerNameFromInput() {
+  if (!playerNameInput || !playerPasswordInput) return;
+  const nextName = sanitizePlayerName(playerNameInput.value);
+  const nextPassword = String(playerPasswordInput.value || '');
+  const usernameError = getUsernameValidationError(nextName);
+  if (usernameError) {
+    if (playerNameError) playerNameError.textContent = usernameError;
+    return;
+  }
+
+  let result;
+  if (authMode === 'signup') {
+    result = createAccount(nextName, nextPassword);
+  } else {
+    result = loginAccount(nextName, nextPassword);
+  }
+
+  if (!result || !result.ok) {
+    if (playerNameError) playerNameError.textContent = result?.message || 'Unable to continue.';
+    return;
+  }
+
+  savedProgress = null;
+  if (playerNameError) {
+    playerNameError.style.color = '#ffed61';
+    playerNameError.textContent = authMode === 'signup' ? 'Account created.' : 'Login successful.';
+  }
+  hideNamePrompt();
+  updateLeaderboardForCurrentPlayer();
+  const action = pendingStartAction;
+  pendingStartAction = null;
+  if (typeof action === 'function') action();
+}
+
 function saveProgress() {
+  if (!currentAccountKey || !hasConfirmedPlayerName) return;
+  updateLeaderboardForCurrentPlayer();
   savedProgress = {
     lives,
     coinBalance,
     spaceWins,
+    totalJumps,
     crownCoinMultiplier,
+    playerName,
+    hasConfirmedPlayerName,
     selectedHat,
     unlockedHats: Array.from(unlockedHats),
     hatColorOverrides: { ...hatColorOverrides },
@@ -1607,9 +2244,12 @@ function restoreProgress() {
   }
   if (!savedProgress) return false;
   const hadSecretUnlockedAlready = secretUnlocked;
-  lives = savedProgress.lives;
+  lives = Math.max(1, Math.floor(Number(savedProgress.lives) || 9));
   coinBalance = savedProgress.coinBalance || 0;
   spaceWins = savedProgress.spaceWins || 0;
+  totalJumps = Math.max(0, Math.floor(Number(savedProgress.totalJumps) || 0));
+  playerName = sanitizePlayerName(playerName || savedProgress.playerName || '');
+  hasConfirmedPlayerName = !!hasConfirmedPlayerName || !!savedProgress.hasConfirmedPlayerName;
   crownCoinMultiplier = Math.max(3, savedProgress.crownCoinMultiplier || 3);
   selectedHat = savedProgress.selectedHat || 'none';
   // Keep a title-screen unlock that happened after the last save.
@@ -1628,17 +2268,18 @@ function restoreProgress() {
   syncAchievementUnlocks();
   unlockAchievementsByState(false);
   ensureSelectedHatIsUnlocked();
-  cameraY = savedProgress.cameraY;
-  dropStartY = savedProgress.dropStartY;
-  player.x = savedProgress.player.x;
-  player.y = savedProgress.player.y;
-  player.vx = savedProgress.player.vx;
-  player.vy = savedProgress.player.vy;
-  player.jumpCount = savedProgress.player.jumpCount;
-  player.facingRight = savedProgress.player.facingRight;
-  player.onGround = savedProgress.player.onGround;
-  player.onIce = savedProgress.player.onIce;
-  platforms = savedProgress.platforms.map((p) => ({
+  cameraY = Number(savedProgress.cameraY) || 0;
+  dropStartY = Number.isFinite(savedProgress.dropStartY) ? savedProgress.dropStartY : null;
+  const savedPlayer = savedProgress.player || {};
+  player.x = Number(savedPlayer.x) || (WIDTH / 2 - 24);
+  player.y = Number(savedPlayer.y) || (GROUND_Y - player.height);
+  player.vx = Number(savedPlayer.vx) || 0;
+  player.vy = Number(savedPlayer.vy) || 0;
+  player.jumpCount = Number(savedPlayer.jumpCount) || 0;
+  player.facingRight = savedPlayer.facingRight !== false;
+  player.onGround = !!savedPlayer.onGround;
+  player.onIce = !!savedPlayer.onIce;
+  platforms = (savedProgress.platforms || []).map((p) => ({
     ...p,
     variant: p.variant === 'breakable' ? 'normal' : p.variant,
     waitTime: 0,
@@ -1650,6 +2291,7 @@ function restoreProgress() {
   showScreen('none');
   updateHUD();
   renderAchievements();
+  updateLeaderboardForCurrentPlayer();
   return true;
 }
 
@@ -1657,8 +2299,13 @@ function resetGame(keepProgress = false) {
   gameState = 'playing';
   lives = 9;
   if (!keepProgress) {
+    // Preserve the player's best standing before wiping run progress.
+    updateLeaderboardForCurrentPlayer(spaceWins, coinBalance, playerName);
+  }
+  if (!keepProgress) {
     coinBalance = 0;
     spaceWins = 0;
+    totalJumps = 0;
     crownCoinMultiplier = 3;
     selectedHat = 'none';
     unlockedHats.clear();
@@ -1697,6 +2344,7 @@ function resetGame(keepProgress = false) {
   hud.classList.remove('hidden');
   updateHUD();
   renderAchievements();
+  updateLeaderboardForCurrentPlayer();
   // force an immediate draw so sprites load and positioning updates
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
   drawBackground();
@@ -1830,6 +2478,37 @@ function createPlatforms() {
     return 'normal';
   };
 
+  const PLATFORM_OVERLAP_PADDING = 6;
+  const overlapsExistingPlatform = (x, y, width, height) => platforms.some((plat) => {
+    if (plat.type !== 'platform') return false;
+    return x < (plat.x + plat.width + PLATFORM_OVERLAP_PADDING)
+      && (x + width + PLATFORM_OVERLAP_PADDING) > plat.x
+      && y < (plat.y + plat.height + PLATFORM_OVERLAP_PADDING)
+      && (y + height + PLATFORM_OVERLAP_PADDING) > plat.y;
+  });
+
+  const findAvailableX = (targetX, yPos, width, height, minX, maxX) => {
+    const low = Math.min(minX, maxX);
+    const high = Math.max(minX, maxX);
+    if (high < low) return null;
+    const clampedTarget = clamp(targetX, low, high);
+    if (!overlapsExistingPlatform(clampedTarget, yPos, width, height)) {
+      return clampedTarget;
+    }
+
+    const span = Math.max(0, high - low);
+    const sweepStep = Math.max(12, Math.floor(span / 16) || 12);
+    for (let probe = low; probe <= high; probe += sweepStep) {
+      if (!overlapsExistingPlatform(probe, yPos, width, height)) {
+        return probe;
+      }
+    }
+    if (!overlapsExistingPlatform(high, yPos, width, height)) {
+      return high;
+    }
+    return null;
+  };
+
   const minGapY = 160;
   const maxGapY = 204;
   let y = WORLD_HEIGHT - 180;
@@ -1854,9 +2533,17 @@ function createPlatforms() {
     const rawShift = (Math.random() * 2 - 1) * (maxEdgeGap * 0.95 + width * 0.12);
     const driftedX = mainX + rawShift;
     const safeCenterX = mainX + (lastMainWidth - width) / 2;
-    mainX = minReachX <= maxReachX
+    const candidateMainX = minReachX <= maxReachX
       ? clamp(driftedX, minReachX, maxReachX)
       : clamp(safeCenterX, worldMinX, worldMaxX);
+    const mainBoundsMinX = minReachX <= maxReachX ? minReachX : worldMinX;
+    const mainBoundsMaxX = minReachX <= maxReachX ? maxReachX : worldMaxX;
+    const resolvedMainX = findAvailableX(candidateMainX, y, width, height, mainBoundsMinX, mainBoundsMaxX);
+    if (resolvedMainX === null) {
+      y -= gapY;
+      continue;
+    }
+    mainX = resolvedMainX;
 
     const flowerDensity = Math.max(0, 1 - altitude / 4500);
     const variant = pickVariantForBiome(biome);
@@ -1891,7 +2578,10 @@ function createPlatforms() {
       const sideBiome = sideAlt < 3500 ? 'earth' : sideAlt < 7300 ? 'cloud' : 'space';
       const sideFlowerDensity = Math.max(0, 1 - sideAlt / 4500);
       const sideVariant = pickVariantForBiome(sideBiome);
-      platforms.push({ x: sideX, y: sideY, width: sideWidth, height: sideHeight, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity, spriteSize: sideSpriteSize });
+      const resolvedSideX = findAvailableX(sideX, sideY, sideWidth, sideHeight, 16, WIDTH - sideWidth - 16);
+      if (resolvedSideX !== null) {
+        platforms.push({ x: resolvedSideX, y: sideY, width: sideWidth, height: sideHeight, type: 'platform', variant: sideVariant, waitTime: 0, biome: sideBiome, flowerDensity: sideFlowerDensity, spriteSize: sideSpriteSize });
+      }
     }
 
     y -= gapY;
@@ -1972,6 +2662,10 @@ function loadAssets(basePath = 'assets') {
       spriteFilePaths.hats.cowboy,
       `${basePath}/${spriteFilePaths.hats.cowboy}`,
     ]).then((i) => (assets.hatCowboy = i)),
+    loadFirstPaths([
+      spriteFilePaths.hats.frog,
+      `${basePath}/${spriteFilePaths.hats.frog}`,
+    ]).then((i) => (assets.hatFrog = i)),
     loadFirstPaths([
       spriteFilePaths.hats.straw,
       `${basePath}/${spriteFilePaths.hats.straw}`,
@@ -2124,6 +2818,7 @@ function winGame() {
   }
   syncAchievementUnlocks();
   unlockAchievementsByState(true);
+  updateLeaderboardForCurrentPlayer();
   gameState = 'win';
   spawnConfetti();
   showScreen('win');
@@ -2393,7 +3088,7 @@ function drawCat() {
       ctx.drawImage(sprite, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
     }
     ctx.restore();
-    drawHatAt(drawX, drawY, drawW, drawH, { isCrouching: manualSit, isWalking: moving && !manualSit, walkFrame });
+    drawHatAt(drawX, drawY, drawW, drawH, { isCrouching: manualSit, isWalking: moving && !manualSit, isSitting, walkFrame });
     return;
   }
 
@@ -2444,7 +3139,7 @@ function drawCat() {
   ctx.fillRect(-24, 10, 14, 14);
   ctx.fillRect(10, 10, 14, 14);
   ctx.restore();
-  drawHatAt(fx, fy, w, h, { isCrouching: manualSit, isWalking: moving && !manualSit, walkFrame });
+  drawHatAt(fx, fy, w, h, { isCrouching: manualSit, isWalking: moving && !manualSit, isSitting, walkFrame });
 }
 
 function applyPhysics() {
@@ -2470,9 +3165,6 @@ function applyPhysics() {
 
   player.vy += 0.72;
   const oldY = player.y;
-  const newY = player.y + player.vy;
-  const oldBottom = oldY + player.height;
-  const newBottom = newY + player.height;
 
   // prevent horizontal sprite clipping by keeping extra sprite padding inside viewport
   const drawW = Math.round(player.width * 1.45);
@@ -2482,26 +3174,42 @@ function applyPhysics() {
   if (player.x < minPlayerX) player.x = minPlayerX;
   if (player.x > maxPlayerX) player.x = maxPlayerX;
 
-  platforms.forEach((plat) => {
-    const isHorizontalOverlap = player.x + player.width > plat.x + 4 && player.x < plat.x + plat.width - 4;
-    if (!isHorizontalOverlap) return;
+  const moveY = player.vy;
+  const verticalStepCount = Math.max(1, Math.ceil(Math.abs(moveY) / 4));
+  const stepY = moveY / verticalStepCount;
+  for (let step = 0; step < verticalStepCount; step += 1) {
+    const prevY = player.y;
+    player.y += stepY;
+    let hitVertical = false;
 
-    const platformTop = plat.y;
-    const platformBottom = plat.y + plat.height;
-    const playerTop = oldY;
-    const newTop = newY;
+    platforms.forEach((plat) => {
+      if (hitVertical) return;
+      const isHorizontalOverlap = player.x + player.width > plat.x + 4 && player.x < plat.x + plat.width - 4;
+      if (!isHorizontalOverlap) return;
 
-    if (oldBottom <= platformTop && newBottom >= platformTop && player.vy >= 0) {
-      player.y = platformTop - player.height;
-      player.vy = 0;
-      player.onGround = true;
-      player.jumpCount = 0;
-      if (plat.variant === 'ice') player.onIce = true;
-    } else if (playerTop >= platformBottom && newTop <= platformBottom && player.vy < 0) {
-      player.y = platformBottom;
-      player.vy = 0;
-    }
-  });
+      const platformTop = plat.y;
+      const platformBottom = plat.y + plat.height;
+      const prevBottom = prevY + player.height;
+      const newBottom = player.y + player.height;
+      const prevTop = prevY;
+      const newTop = player.y;
+
+      if (stepY >= 0 && prevBottom <= platformTop && newBottom >= platformTop) {
+        player.y = platformTop - player.height;
+        player.vy = 0;
+        player.onGround = true;
+        player.jumpCount = 0;
+        if (plat.variant === 'ice') player.onIce = true;
+        hitVertical = true;
+      } else if (stepY < 0 && prevTop >= platformBottom && newTop <= platformBottom) {
+        player.y = platformBottom;
+        player.vy = 0;
+        hitVertical = true;
+      }
+    });
+
+    if (hitVertical) break;
+  }
 
   // landing and fall-damage detection
   if (!wasOnGround && player.onGround) {
@@ -2529,10 +3237,6 @@ function applyPhysics() {
   if (player.onGround) coyoteFrames = 7;
   else if (coyoteFrames > 0) coyoteFrames -= 1;
 
-  if (!player.onGround) {
-    player.y = newY;
-  }
-
   // horizontal movement: acceleration then apply friction based on surface
   const isCrouching = keys.down && player.onGround;
   const maxGroundSpeed = isCrouching ? player.speed * 0.15 : player.speed;
@@ -2549,7 +3253,7 @@ function applyPhysics() {
   }
 
   const moveX = player.vx;
-  const stepCount = Math.max(1, Math.ceil(Math.abs(moveX) / 4));
+  const stepCount = Math.max(1, Math.ceil(Math.abs(moveX) / 3));
   const stepX = moveX / stepCount;
   for (let s = 0; s < stepCount; s += 1) {
     const oldX = player.x;
@@ -2569,10 +3273,27 @@ function applyPhysics() {
         player.x = plat.x + plat.width;
         player.vx = 0;
         hitSide = true;
+      } else {
+        const horizontalOverlap = player.x + player.width > plat.x && player.x < plat.x + plat.width;
+        if (horizontalOverlap) {
+          // Fallback overlap correction to prevent phasing at high diagonal speeds.
+          const overlapFromLeft = Math.abs((player.x + player.width) - plat.x);
+          const overlapFromRight = Math.abs((plat.x + plat.width) - player.x);
+          if (oldX + player.width <= plat.x || overlapFromLeft <= overlapFromRight) {
+            player.x = plat.x - player.width;
+          } else {
+            player.x = plat.x + plat.width;
+          }
+          player.vx = 0;
+          hitSide = true;
+        }
       }
     });
     if (hitSide) break;
   }
+
+  if (player.x < minPlayerX) player.x = minPlayerX;
+  if (player.x > maxPlayerX) player.x = maxPlayerX;
 
   coins.forEach((coin) => {
     if (coin.collected) return;
@@ -2596,16 +3317,20 @@ function applyPhysics() {
   if ((player.onGround || coyoteFrames > 0) && jumpBufferFrames > 0) {
     player.vy = groundJump;
     player.jumpCount = 1;
+    totalJumps += 1;
     coyoteFrames = 0;
     jumpBufferFrames = 0;
     keys.jump = false;
+    unlockAchievementsByState(true);
   }
 
   if (!player.onGround && jumpBufferFrames > 0 && player.jumpCount < 2) {
     player.vy = airJump;
     player.jumpCount += 1;
+    totalJumps += 1;
     jumpBufferFrames = 0;
     keys.jump = false;
+    unlockAchievementsByState(true);
   }
 
   if (player.y > WORLD_HEIGHT + 120) {
@@ -2726,13 +3451,17 @@ function loop() {
 
 if (startBtn) {
   startBtn.addEventListener('click', () => {
-    showScreen('none');
-    startGame();
+    ensurePlayerNameBefore(() => {
+      showScreen('none');
+      startGame();
+    });
   });
 }
 if (introBtn) {
   introBtn.addEventListener('click', () => {
-    startGuidedTutorial();
+    ensurePlayerNameBefore(() => {
+      startGuidedTutorial();
+    });
   });
 }
 if (secretBtn) {
@@ -2774,9 +3503,10 @@ if (quitBtn) {
     if (tutorialActive) return;
     showWarningModal(
       'Quit to Title?',
-      'Quit saves current progress and exits to the title screen.',
+      'Quit saves current progress, logs out, and exits to the title screen.',
       () => {
         saveProgress();
+        logoutCurrentAccount();
         gameState = 'title';
         showScreen('title');
         hud.classList.add('hidden');
@@ -2796,6 +3526,13 @@ if (achievementsBtn) {
   achievementsBtn.addEventListener('click', () => {
     if (tutorialActive) return;
     openAchievements();
+  });
+}
+
+if (leaderboardBtn) {
+  leaderboardBtn.addEventListener('click', () => {
+    if (tutorialActive) return;
+    openLeaderboard();
   });
 }
 
@@ -2825,6 +3562,54 @@ if (achievementsCloseBtn) {
   });
 }
 
+if (leaderboardCloseBtn) {
+  leaderboardCloseBtn.addEventListener('click', () => {
+    closeLeaderboard();
+  });
+}
+
+if (playerNameConfirmBtn) {
+  playerNameConfirmBtn.addEventListener('click', () => {
+    confirmPlayerNameFromInput();
+  });
+}
+
+if (playerNameCancelBtn) {
+  playerNameCancelBtn.addEventListener('click', () => {
+    cancelPlayerNamePrompt();
+  });
+}
+
+if (playerNameInput) {
+  playerNameInput.addEventListener('keydown', (event) => {
+    if (event.code === 'Enter' || event.key === 'Enter') {
+      event.preventDefault();
+      confirmPlayerNameFromInput();
+    }
+  });
+}
+
+if (playerPasswordInput) {
+  playerPasswordInput.addEventListener('keydown', (event) => {
+    if (event.code === 'Enter' || event.key === 'Enter') {
+      event.preventDefault();
+      confirmPlayerNameFromInput();
+    }
+  });
+}
+
+if (authLoginModeBtn) {
+  authLoginModeBtn.addEventListener('click', () => {
+    setAuthMode('login');
+  });
+}
+
+if (authSignupModeBtn) {
+  authSignupModeBtn.addEventListener('click', () => {
+    setAuthMode('signup');
+  });
+}
+
 if (deathPlayAgainBtn) {
   deathPlayAgainBtn.addEventListener('click', () => {
     showScreen('none');
@@ -2835,6 +3620,7 @@ if (deathPlayAgainBtn) {
 if (deathQuitBtn) {
   deathQuitBtn.addEventListener('click', () => {
     saveProgress();
+    logoutCurrentAccount();
     gameState = 'title';
     showScreen('title');
     hud.classList.add('hidden');
@@ -2931,6 +3717,22 @@ if (adminCoinApplyBtn) {
 }
 
 window.addEventListener('keydown', (event) => {
+  if (namePromptOverlay && !namePromptOverlay.classList.contains('hidden')) {
+    const typingInNameInput = event.target === playerNameInput
+      || document.activeElement === playerNameInput
+      || event.target === playerPasswordInput
+      || document.activeElement === playerPasswordInput;
+    if (event.code === 'Escape') {
+      cancelPlayerNamePrompt();
+      event.preventDefault();
+      return;
+    }
+    if (typingInNameInput) {
+      return;
+    }
+    event.preventDefault();
+    return;
+  }
   if (tutorialActive) {
     if (event.code === 'Escape') endGuidedTutorial();
     event.preventDefault();
@@ -2943,6 +3745,11 @@ window.addEventListener('keydown', (event) => {
   }
   if (achievementsOverlay && !achievementsOverlay.classList.contains('hidden')) {
     if (event.code === 'Escape') closeAchievements();
+    event.preventDefault();
+    return;
+  }
+  if (leaderboardOverlay && !leaderboardOverlay.classList.contains('hidden')) {
+    if (event.code === 'Escape') closeLeaderboard();
     event.preventDefault();
     return;
   }
@@ -2979,6 +3786,17 @@ window.addEventListener('keydown', (event) => {
   handleInput(event, true);
 });
 window.addEventListener('keyup', (event) => {
+  if (namePromptOverlay && !namePromptOverlay.classList.contains('hidden')) {
+    const typingInNameInput = event.target === playerNameInput
+      || document.activeElement === playerNameInput
+      || event.target === playerPasswordInput
+      || document.activeElement === playerPasswordInput;
+    if (typingInNameInput) {
+      return;
+    }
+    event.preventDefault();
+    return;
+  }
   if (tutorialActive) {
     event.preventDefault();
     return;
@@ -3013,6 +3831,9 @@ window.addEventListener('pagehide', () => {
 showScreen('title');
 updateSecretButtonVisibility();
 setHudRightButtonsCollapsed(false);
+loadAccountStore();
+loadLeaderboardData();
+setAuthMode('login');
 // initialize canvas size and content
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -3111,5 +3932,4 @@ if (titleHeading) {
   titleHeading.addEventListener('mouseleave', cancelTitleHoverTimer);
 }
 
-showScreen('title');
 loop();

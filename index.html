@@ -13,7 +13,6 @@
         <p>Guide the cat safely through a dreamy sky climb.</p>
         <div class="button-row">
           <button id="startBtn">Start</button>
-          <button id="introBtn">Intro</button>
         </div>
       </div>
   </div>
@@ -68,6 +67,7 @@
       <div id="hudRightButtons">
         <button id="shopBtn" class="hud-button">Hats</button>
         <button id="achievementsBtn" class="hud-button">Achievements</button>
+        <button id="leaderboardBtn" class="hud-button">Leaderboard</button>
         <button id="hudIntroBtn" class="hud-button">Intro</button>
         <button id="resetBtn" class="hud-button">Reset</button>
         <button id="quitBtn" class="hud-button">Quit</button>
@@ -90,6 +90,33 @@
       <h2>Achievements</h2>
       <div id="achievementsList" class="achievements-list"></div>
       <button id="achievementsCloseBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="leaderboardOverlay" class="overlay hidden">
+    <div class="shop-panel leaderboard-panel">
+      <h2>Leaderboard</h2>
+      <div id="leaderboardMeta" class="leaderboard-meta"></div>
+      <div id="leaderboardList" class="leaderboard-list"></div>
+      <button id="leaderboardCloseBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="namePromptOverlay" class="overlay warning-overlay hidden">
+    <div class="warning-panel name-prompt-panel">
+      <h2>Player Account</h2>
+      <p>Log in or create an account to keep your progress.</p>
+      <div class="auth-mode-row" role="group" aria-label="Account mode">
+        <button id="authLoginModeBtn" class="auth-mode-btn active" type="button">Login</button>
+        <button id="authSignupModeBtn" class="auth-mode-btn" type="button">Create Account</button>
+      </div>
+      <input id="playerNameInput" class="name-input" type="text" maxlength="24" placeholder="Username" autocomplete="username" />
+      <input id="playerPasswordInput" class="name-input" type="password" maxlength="64" placeholder="Password" autocomplete="current-password" />
+      <p id="playerNameError" class="name-error" aria-live="polite"></p>
+      <div class="button-row warning-actions">
+        <button id="playerNameCancelBtn">Cancel</button>
+        <button id="playerNameConfirmBtn">Continue</button>
+      </div>
     </div>
   </div>
 

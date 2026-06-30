@@ -583,7 +583,7 @@ button:hover {
 .mobile-controls {
   position: fixed;
   left: 50%;
-  bottom: 14px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   display: none;
   gap: 10px;
@@ -610,6 +610,43 @@ button:hover {
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
   touch-action: none;
   user-select: none;
+}
+
+.mobile-controls.compact-portrait {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(2, 64px);
+  gap: 8px;
+  align-items: center;
+  justify-items: center;
+  padding: 8px;
+}
+
+.mobile-controls.compact-portrait .mobile-control-btn {
+  width: 64px;
+  min-width: 64px;
+  height: 64px;
+}
+
+.mobile-controls.compact-portrait .mobile-down {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.mobile-controls.compact-portrait .mobile-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.mobile-controls.compact-portrait .mobile-right {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.mobile-controls.compact-portrait .mobile-up {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  height: 136px;
 }
 
 .mobile-control-btn::before {
@@ -642,6 +679,23 @@ button:hover {
 @media (hover: none), (pointer: coarse) {
   .mobile-controls {
     display: flex;
+  }
+}
+
+@media (hover: none), (pointer: coarse) and (orientation: portrait) {
+  #hud {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+  }
+
+  #hudLeft {
+    gap: 8px;
+  }
+
+  #hudLeft > div {
+    min-width: auto;
+    padding: 8px 10px;
   }
 }
 
@@ -703,12 +757,156 @@ button:hover {
 .achievements-list {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 0;
   overflow-y: auto;
   min-height: 0;
   padding-right: 6px;
+}
+
+.achievement-section {
+  display: grid;
+  gap: 8px;
+}
+
+.achievement-section-title {
+  text-align: left;
+  font-size: clamp(14px, 1.8vw, 16px);
+  opacity: 0.95;
+}
+
+.achievement-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .achievement-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .achievement-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leaderboard-panel {
+  max-height: min(84vh, 860px);
+}
+
+.leaderboard-meta {
+  font-size: clamp(13px, 1.6vw, 15px);
+  opacity: 0.95;
+}
+
+.leaderboard-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 0;
+  padding-right: 6px;
+}
+
+.leaderboard-entry {
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background: rgba(5, 12, 34, 0.72);
+  padding: 10px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.leaderboard-rank {
+  font-size: clamp(15px, 1.8vw, 17px);
+  opacity: 0.92;
+}
+
+.leaderboard-name {
+  font-size: clamp(15px, 1.8vw, 17px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-stat {
+  font-size: clamp(13px, 1.6vw, 15px);
+  opacity: 0.95;
+}
+
+.leaderboard-empty {
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background: rgba(5, 12, 34, 0.72);
+  padding: 14px;
+  text-align: center;
+}
+
+.name-prompt-panel {
+  width: min(520px, 92vw);
+}
+
+.auth-mode-row {
+  width: min(360px, 100%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 auto 10px;
+}
+
+.auth-mode-btn {
+  min-width: 0;
+  width: 100%;
+  padding: 12px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.auth-mode-btn.active {
+  border-color: #6a6fc9;
+  box-shadow: 0 0 0 2px rgba(106, 111, 201, 0.3);
+}
+
+.name-input {
+  width: min(320px, 100%);
+  background: rgba(7, 12, 31, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.32);
+  color: #fff;
+  font-family: 'Vibe Coding Title', 'Vibe Coding Body', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(18px, 2.4vw, 24px);
+  text-align: center;
+  border-radius: 2px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.name-input::placeholder {
+  font-family: 'Vibe Coding Title', 'Vibe Coding Body', system-ui, sans-serif;
+  font-weight: 700;
+}
+
+#playerPasswordInput {
+  font-family: system-ui, sans-serif;
+}
+
+.name-error {
+  min-height: 1.4em;
+  color: #ffd68f;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 600px) {
+  .leaderboard-entry {
+    grid-template-columns: auto 1fr;
+  }
 }
 
 .achievement-card {
@@ -761,6 +959,10 @@ button:hover {
   image-rendering: pixelated;
 }
 
+.hat-preview-image-hidden {
+  display: none;
+}
+
 .hat-preview-tint {
   position: absolute;
   left: 50%;
@@ -781,6 +983,29 @@ button:hover {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
+}
+
+.hat-preview-tint.hidden {
+  display: none;
+}
+
+.hat-preview-missing {
+  position: absolute;
+  inset: 10px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 8px;
+  color: rgba(255, 255, 255, 0.92);
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  background: rgba(4, 9, 28, 0.58);
+}
+
+.hat-preview-missing.active {
+  display: flex;
 }
 
 .hat-preview-has-tint .hat-preview-tint {
