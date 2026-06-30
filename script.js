@@ -40,6 +40,9 @@ const mobileJump = document.getElementById('mobileJump');
 const shopBtn = document.getElementById('shopBtn');
 const achievementsBtn = document.getElementById('achievementsBtn');
 const hudIntroBtn = document.getElementById('hudIntroBtn');
+const hudToggleBtn = document.getElementById('hudToggleBtn');
+const hudRight = document.getElementById('hudRight');
+const hudRightButtons = document.getElementById('hudRightButtons');
 const shopOverlay = document.getElementById('shopOverlay');
 const shopCoins = document.getElementById('shopCoins');
 const shopItems = document.getElementById('shopItems');
@@ -160,12 +163,14 @@ let titleHoverTimer = null;
 let secretRainActive = false;
 let secretRainStopAt = 0;
 let secretRainDrops = [];
+let hudRightButtonsCollapsed = false;
 const unlockedAchievements = new Set();
 const pendingAchievementQueue = [];
 const hatColorOverrides = {};
 const maskedHatSpriteCache = new Map();
 const grayscaleHatSpriteCache = new Map();
 const tintedHatSpriteCache = new Map();
+const SAVE_STORAGE_KEY = 'project2_2_saved_progress_v1';
 
 const achievementCatalog = {
   first_coin: {
@@ -713,6 +718,24 @@ function updateSecretButtonVisibility() {
   secretBtn.classList.toggle('hidden', !(secretUnlocked && secretAvailableAfterStart && gameState === 'playing'));
 }
 
+function setHudRightButtonsCollapsed(collapsed) {
+  hudRightButtonsCollapsed = !!collapsed;
+  if (hudRight) {
+    hudRight.classList.toggle('collapsed', hudRightButtonsCollapsed);
+  }
+  if (hudRightButtons) {
+    hudRightButtons.classList.toggle('hidden', hudRightButtonsCollapsed);
+  }
+  if (hudToggleBtn) {
+    hudToggleBtn.setAttribute('aria-expanded', hudRightButtonsCollapsed ? 'false' : 'true');
+    hudToggleBtn.textContent = '☰';
+  }
+}
+
+function toggleHudRightButtons() {
+  setHudRightButtonsCollapsed(!hudRightButtonsCollapsed);
+}
+
 function getSecretCatSpritePath() {
   return encodeAssetPath('assets/cat_standNew.png');
 }
@@ -775,6 +798,10 @@ function updateSecretRain() {
   }
 }
 
+function isTitleScreenActive() {
+  return gameState === 'title' && !!titleScreen && !titleScreen.classList.contains('hidden');
+}
+
 function unlockSecretPanel() {
   if (secretUnlocked) return;
   secretUnlocked = true;
@@ -790,11 +817,15 @@ function unlockSecretPanel() {
 }
 
 function beginTitleHoverTimer() {
-  if (secretUnlocked || !titleHeading) return;
+  if (secretUnlocked || !titleHeading || !isTitleScreenActive()) return;
   if (titleHoverTimer) clearTimeout(titleHoverTimer);
   titleHeading.classList.add('arming');
   titleHoverTimer = setTimeout(() => {
-    unlockSecretPanel();
+    if (isTitleScreenActive()) {
+      unlockSecretPanel();
+    } else {
+      cancelTitleHoverTimer();
+    }
   }, 5000);
 }
 
@@ -935,6 +966,7 @@ function endGuidedTutorial() {
 function startGuidedTutorial() {
   hideWarningModal();
   closeShop();
+  setHudRightButtonsCollapsed(false);
   showScreen('none');
   if (gameState !== 'playing') {
     resetGame();
@@ -1499,6 +1531,45 @@ function getSpriteFrame(img) {
   return frame;
 }
 
+function canUseLocalStorage() {
+  try {
+    return typeof window !== 'undefined' && !!window.localStorage;
+  } catch {
+    return false;
+  }
+}
+
+function writePersistentProgress() {
+  if (!savedProgress || !canUseLocalStorage()) return;
+  try {
+    window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(savedProgress));
+  } catch {
+    // Ignore storage write failures (private mode, quota, blocked storage).
+  }
+}
+
+function loadPersistentProgress() {
+  if (!canUseLocalStorage()) return null;
+  try {
+    const raw = window.localStorage.getItem(SAVE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistentProgress() {
+  if (!canUseLocalStorage()) return;
+  try {
+    window.localStorage.removeItem(SAVE_STORAGE_KEY);
+  } catch {
+    // Ignore storage delete failures.
+  }
+}
+
 function saveProgress() {
   savedProgress = {
     lives,
@@ -1526,9 +1597,14 @@ function saveProgress() {
     coins: coins.map((c) => ({ ...c })),
     spaceHazards: spaceHazards.map((h) => ({ ...h })),
   };
+  writePersistentProgress();
 }
 
 function restoreProgress() {
+  if (!savedProgress) {
+    const diskProgress = loadPersistentProgress();
+    if (diskProgress) savedProgress = diskProgress;
+  }
   if (!savedProgress) return false;
   const hadSecretUnlockedAlready = secretUnlocked;
   lives = savedProgress.lives;
@@ -1596,7 +1672,10 @@ function resetGame(keepProgress = false) {
     });
   }
   syncAchievementUnlocks();
-  savedProgress = null;
+  if (!keepProgress) {
+    savedProgress = null;
+    clearPersistentProgress();
+  }
   player.x = WIDTH / 2 - 24;
   player.y = GROUND_Y - player.height;
   player.vx = 0;
@@ -1992,9 +2071,16 @@ function showScreen(screen) {
     screenEl.classList.remove('active');
   });
 
+  if (screen !== 'title') {
+    cancelTitleHoverTimer();
+  }
+
   if (screen === 'title') {
     titleScreen.classList.remove('hidden');
     titleScreen.classList.add('active');
+    if (titleHeading && titleHeading.matches(':hover')) {
+      beginTitleHoverTimer();
+    }
   }
   if (screen === 'intro') {
     introScreen.classList.remove('hidden');
@@ -2720,6 +2806,13 @@ if (hudIntroBtn) {
   });
 }
 
+if (hudToggleBtn) {
+  hudToggleBtn.addEventListener('click', () => {
+    if (tutorialActive) return;
+    toggleHudRightButtons();
+  });
+}
+
 if (shopCloseBtn) {
   shopCloseBtn.addEventListener('click', () => {
     closeShop();
@@ -2741,6 +2834,7 @@ if (deathPlayAgainBtn) {
 
 if (deathQuitBtn) {
   deathQuitBtn.addEventListener('click', () => {
+    saveProgress();
     gameState = 'title';
     showScreen('title');
     hud.classList.add('hidden');
@@ -2905,10 +2999,20 @@ window.addEventListener('blur', () => {
   keys.up = false;
   keys.down = false;
   keys.jump = false;
+  if (gameState === 'playing' || gameState === 'win') {
+    saveProgress();
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  if (gameState === 'playing' || gameState === 'win') {
+    saveProgress();
+  }
 });
 
 showScreen('title');
 updateSecretButtonVisibility();
+setHudRightButtonsCollapsed(false);
 // initialize canvas size and content
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();

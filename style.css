@@ -259,10 +259,40 @@ button:hover {
 #hudRight {
   display: flex;
   gap: 12px;
+  align-items: center;
   pointer-events: auto;
 }
 
-#hud div {
+#hudRightButtons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Keep button wrappers layout-only so no outer grouping box is shown. */
+#hudRight,
+#hudRightButtons {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+#hudRight.collapsed #hudRightButtons {
+  display: none;
+}
+
+.hud-menu-toggle {
+  min-width: 52px;
+  padding: 12px 14px;
+  font-size: 22px;
+  line-height: 1;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#hudLeft > div {
   background: rgba(10, 18, 38, 0.7);
   padding: 12px 16px;
   border-radius: 2px;
