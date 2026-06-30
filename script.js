@@ -57,6 +57,13 @@ const secretCoinInput = document.getElementById('secretCoinInput');
 const secretCoinApplyBtn = document.getElementById('secretCoinApplyBtn');
 const secretPanelCloseBtn = document.getElementById('secretPanelCloseBtn');
 const secretPanelError = document.getElementById('secretPanelError');
+const adminPanelOverlay = document.getElementById('adminPanelOverlay');
+const adminUnlockAllHatsBtn = document.getElementById('adminUnlockAllHatsBtn');
+const adminUnlockAllAchievementsBtn = document.getElementById('adminUnlockAllAchievementsBtn');
+const adminPanelCloseBtn = document.getElementById('adminPanelCloseBtn');
+const adminCoinInput = document.getElementById('adminCoinInput');
+const adminCoinError = document.getElementById('adminCoinError');
+const adminCoinApplyBtn = document.getElementById('adminCoinApplyBtn');
 
 let WIDTH = canvas.width;
 let HEIGHT = canvas.height;
@@ -85,6 +92,7 @@ let coins = [];
 let coinBursts = [];
 let coinBalance = 0;
 let spaceWins = 0;
+let crownCoinMultiplier = 3;
 let spaceHazards = [];
 let damageCooldown = 0;
 let dropStartY = null;
@@ -120,6 +128,10 @@ const assets = {
   hatParty: null,
   hatCrown: null,
   hatWitch: null,
+  hatTop: null,
+  hatChef: null,
+  hatCowboy: null,
+  hatStraw: null,
   grassSmall: null,
   grassMedium: null,
   grassLarge: null,
@@ -161,44 +173,49 @@ const achievementCatalog = {
     description: 'Collect your first coin.',
     isUnlocked: () => coinBalance >= 1,
   },
-  coin_hoarder: {
-    name: 'Coin Hoarder',
-    description: 'Collect 25 total coins.',
-    isUnlocked: () => coinBalance >= 25,
-  },
   coin_centurion: {
     name: 'Coin Centurion',
     description: 'Collect 100 total coins.',
     isUnlocked: () => coinBalance >= 100,
+  },
+  coin_hoarder: {
+    name: 'High Roller',
+    description: 'Collect 1000 total coins.',
+    isUnlocked: () => coinBalance >= 1000,
   },
   first_win: {
     name: 'Sky Breaker',
     description: 'Reach space for the first time.',
     isUnlocked: () => spaceWins >= 1,
   },
+  triple_top: {
+    name: 'Top Cat',
+    description: 'Reach space 3 times.',
+    isUnlocked: () => spaceWins >= 3,
+  },
   crown_unlock: {
     name: 'Cosmic Royalty',
-    description: 'Reach space 10 times and unlock the Crown hat.',
+    description: 'Reach space 10 times.',
     isUnlocked: () => spaceWins >= 10,
   },
   hat_collector: {
     name: 'Catwalk Ready',
-    description: 'Buy your first hat from the shop.',
+    description: 'Buy/Earn your first hat.',
     isUnlocked: () => unlockedHats.size > 1,
   },
   hat_trio: {
     name: 'Hat Trick',
-    description: 'Buy or earn 3 hats.',
+    description: 'Buy/Earn 3 hats.',
     isUnlocked: () => Array.from(unlockedHats).filter((h) => h !== 'none').length >= 3,
   },
   hat_master: {
     name: 'Full Closet',
-    description: 'Buy or earn all hats.',
-    isUnlocked: () => Array.from(unlockedHats).filter((h) => h !== 'none').length >= 4,
+    description: 'Buy/Earn all hats.',
+    isUnlocked: () => Array.from(unlockedHats).filter((h) => h !== 'none').length >= (hatCatalog.length - 1),
   },
   secret_found: {
-    name: 'Hidden Pawnel',
-    description: 'Unlock the secret panel.',
+    name: 'Admin Pawnel',
+    description: 'Find the admin pawnel.',
     isUnlocked: () => secretUnlocked,
   },
 };
@@ -230,6 +247,11 @@ const tutorialSteps = [
     target: 'shopBtn',
   },
   {
+    title: 'Achievements Button',
+    message: 'Click the achievements button to view unlock goals and track your progress.',
+    target: 'achievementsBtn',
+  },
+  {
     title: 'Reset Button',
     message: 'Click the reset button to reset your progress and start from the beginning.',
     target: 'resetBtn',
@@ -254,19 +276,28 @@ const tutorialSteps = [
 
 const hatCatalog = [
   { id: 'none', label: 'No Hat', cost: 0, color: '#ffffff' },
-  { id: 'cap', label: 'Red Cap', cost: 10, color: '#df5252' },
-  { id: 'party', label: 'Party Hat', cost: 15, color: '#f48252' },
-  { id: 'crown', label: 'Crown', cost: 0, color: '#f4ce46', unlockType: 'spaceWins', requiredWins: 10 },
+  { id: 'cap', label: 'Cap', cost: 10, color: '#df5252' },
+  { id: 'party', label: 'Party Hat', cost: 15, color: '#4da6ff' },
+  { id: 'chef', label: 'Chef Hat', cost: 20, color: '#f0f2ff' },
+  { id: 'straw', label: 'Straw Hat', cost: 20, color: '#d5b75a' },
+  { id: 'cowboy', label: 'Cowboy Hat', cost: 25, color: '#b5854e' },
   { id: 'wizard', label: 'Wizard Hat', cost: 30, color: '#7f79df' },
+  { id: 'top', label: 'Top Hat', cost: 0, color: '#1e1f2b', unlockType: 'achievement', requiredAchievement: 'coin_hoarder' },
+  { id: 'crown', label: 'Crown', cost: 0, color: '#f4ce46', unlockType: 'spaceWins', requiredWins: 10 },
 ];
 
 const spriteFilePaths = {
   coin: 'Vibe Coding Assets (3) #12 Coin.png',
   hats: {
+    none: 'Vibe Coding Assets (3) #16 No Hat.png',
     cap: 'Vibe Coding Assets (3) #13 Cap.png',
     party: 'Vibe Coding Assets (3) #14 Party Hat.png',
     crown: 'Vibe Coding Assets (3) #15 Crown.png',
     wizard: 'Vibe Coding Assets (3) #16 Witch Hat.png',
+    straw: 'Vibe Coding Assets (3) #21 Strawhat.png',
+    top: 'Vibe Coding Assets (3) #22 Top Hat.png',
+    chef: 'Vibe Coding Assets (3) #23 Chef Hat.png',
+    cowboy: 'Vibe Coding Assets (3) #24 Cowboy Hat.png',
   },
 };
 
@@ -283,6 +314,10 @@ function getSelectedHatSprite() {
   if (selectedHat === 'party') return assets.hatParty;
   if (selectedHat === 'crown') return assets.hatCrown;
   if (selectedHat === 'wizard') return assets.hatWitch;
+  if (selectedHat === 'top') return assets.hatTop;
+  if (selectedHat === 'chef') return assets.hatChef;
+  if (selectedHat === 'cowboy') return assets.hatCowboy;
+  if (selectedHat === 'straw') return assets.hatStraw;
   return null;
 }
 
@@ -421,10 +456,34 @@ function getGrayscaleHatCanvas(cacheKey, maskedBase) {
 
 function getHatPlacement(hatId) {
   if (hatId === 'cap') {
-    return { widthRatio: 0.68, heightRatio: 0.34, xOffset: 0.205, bottomYRatio: 0.21 };
+    return {
+      widthRatio: 0.68,
+      heightRatio: 0.34,
+      xOffset: 0.145,
+      bottomYRatio: 0.21,
+      walkXOffset: 0.175,
+      walkBottomYRatio: 0.25,
+      crouchXOffset: 0.19,
+      crouchBottomYRatio: 0.33,
+      standFineNudgePx: -24,
+      walkFineNudgePx: -16,
+      crouchFineNudgePx: -12,
+    };
   }
   if (hatId === 'party') {
-    return { widthRatio: 0.7, heightRatio: 0.43, xOffset: 0.165, bottomYRatio: 0.2 };
+    return {
+      widthRatio: 0.7,
+      heightRatio: 0.43,
+      xOffset: 0.165,
+      bottomYRatio: 0.2,
+      walkXOffset: 0.18,
+      walkBottomYRatio: 0.235,
+      crouchXOffset: 0.2,
+      crouchBottomYRatio: 0.31,
+      standFineNudgePx: 6,
+      walkFineNudgePx: 9,
+      crouchFineNudgePx: 10,
+    };
   }
   if (hatId === 'crown') {
     return { widthRatio: 0.65, heightRatio: 0.37, xOffset: 0.135, bottomYRatio: 0.19 };
@@ -432,10 +491,73 @@ function getHatPlacement(hatId) {
   if (hatId === 'wizard') {
     return { widthRatio: 0.78, heightRatio: 0.46, xOffset: 0.135, bottomYRatio: 0.21 };
   }
+  if (hatId === 'top') {
+    return {
+      widthRatio: 0.66,
+      heightRatio: 0.5,
+      xOffset: 0.12,
+      bottomYRatio: 0.24,
+      walkXOffset: 0.16,
+      walkBottomYRatio: 0.275,
+      crouchXOffset: 0.19,
+      crouchBottomYRatio: 0.345,
+      standFineNudgePx: 24,
+      walkFineNudgePx: 16,
+      crouchFineNudgePx: 14,
+    };
+  }
+  if (hatId === 'chef') {
+    return {
+      widthRatio: 0.7,
+      heightRatio: 0.54,
+      xOffset: 0.115,
+      bottomYRatio: 0.24,
+      walkXOffset: 0.16,
+      walkBottomYRatio: 0.285,
+      crouchXOffset: 0.19,
+      crouchBottomYRatio: 0.34,
+      standFineNudgePx: 24,
+      walkFineNudgePx: 18,
+      crouchFineNudgePx: 15,
+    };
+  }
+  if (hatId === 'cowboy') {
+    return {
+      widthRatio: 0.8,
+      heightRatio: 0.42,
+      xOffset: 0.12,
+      bottomYRatio: 0.22,
+      walkXOffset: 0.165,
+      walkBottomYRatio: 0.255,
+      crouchXOffset: 0.19,
+      crouchBottomYRatio: 0.325,
+      standFineNudgePx: 24,
+      walkFineNudgePx: 16,
+      crouchFineNudgePx: 14,
+    };
+  }
+  if (hatId === 'straw') {
+    return {
+      widthRatio: 0.78,
+      heightRatio: 0.38,
+      xOffset: 0.12,
+      bottomYRatio: 0.21,
+      walkXOffset: 0.16,
+      walkBottomYRatio: 0.245,
+      crouchXOffset: 0.19,
+      crouchBottomYRatio: 0.315,
+      standFineNudgePx: 24,
+      walkFineNudgePx: 16,
+      crouchFineNudgePx: 14,
+    };
+  }
   return { widthRatio: 0.72, heightRatio: 0.42, xOffset: 0.135, bottomYRatio: 0.2 };
 }
 
 function syncAchievementUnlocks() {
+  if (unlockedAchievements.has('coin_hoarder') || coinBalance >= 1000) {
+    unlockedHats.add('top');
+  }
   if (spaceWins >= 10) {
     unlockedHats.add('crown');
   } else {
@@ -538,6 +660,52 @@ function hideSecretPanel() {
   if (!secretPanelOverlay) return;
   secretPanelOverlay.classList.add('hidden');
   secretPanelOverlay.classList.remove('active');
+}
+
+function showAdminPanel() {
+  if (!secretUnlocked || !adminPanelOverlay) return;
+  hideWarningModal();
+  closeShop();
+  closeAchievements();
+  hideSecretPanel();
+  if (adminCoinError) adminCoinError.textContent = '';
+  if (adminCoinInput) {
+    adminCoinInput.value = '';
+    adminCoinInput.focus();
+  }
+  adminPanelOverlay.classList.remove('hidden');
+  adminPanelOverlay.classList.add('active');
+}
+
+function hideAdminPanel() {
+  if (!adminPanelOverlay) return;
+  adminPanelOverlay.classList.add('hidden');
+  adminPanelOverlay.classList.remove('active');
+}
+
+function unlockAllHats() {
+  unlockedHats.add('cap');
+  unlockedHats.add('party');
+  unlockedHats.add('chef');
+  unlockedHats.add('cowboy');
+  unlockedHats.add('straw');
+  unlockedHats.add('top');
+  unlockedHats.add('crown');
+  unlockedHats.add('wizard');
+  coinBalance = Math.max(coinBalance, 1000);
+  spaceWins = 10;
+  unlockAchievementsByState(false);
+  updateCoinsHUD();
+  syncAchievementUnlocks();
+  renderShop();
+  if (selectedHat === 'none') selectedHat = 'cap';
+}
+
+function unlockAllAchievements() {
+  Object.keys(achievementCatalog).forEach((id) => {
+    unlockAchievement(id, false);
+  });
+  renderAchievements();
 }
 
 function updateSecretButtonVisibility() {
@@ -803,26 +971,33 @@ function updateCoinsHUD() {
 function createHatPreview(hatId, tintColor = null, isLocked = false) {
   const preview = document.createElement('div');
   preview.className = 'hat-preview';
-  if (isLocked) preview.classList.add('hat-preview-locked');
+
+  const spritePath = getHatSpritePath(hatId);
+  if (spritePath) {
+    const encodedSpritePath = encodeAssetPath(spritePath);
+    const img = document.createElement('img');
+    img.className = 'hat-preview-image';
+    img.alt = `${hatId} hat`;
+    img.src = encodedSpritePath;
+    preview.appendChild(img);
+    const tint = document.createElement('div');
+    tint.className = 'hat-preview-tint';
+    tint.style.setProperty('--hat-mask-url', `url("${encodedSpritePath}")`);
+    preview.appendChild(tint);
+    if (isLocked) preview.classList.add('hat-preview-locked-sprite');
+    if (tintColor) {
+      preview.style.setProperty('--hat-tint', tintColor);
+      preview.classList.add('hat-preview-has-tint');
+    }
+    return preview;
+  }
 
   if (hatId === 'none') {
+    if (isLocked) preview.classList.add('hat-preview-locked');
     const none = document.createElement('div');
     none.className = 'hat-preview-none';
     none.textContent = 'No Hat';
     preview.appendChild(none);
-    return preview;
-  }
-
-  const spritePath = getHatSpritePath(hatId);
-  if (spritePath) {
-    const img = document.createElement('img');
-    img.className = 'hat-preview-image';
-    img.alt = `${hatId} hat`;
-    img.src = encodeAssetPath(spritePath);
-    preview.appendChild(img);
-    const tint = document.createElement('div');
-    tint.className = 'hat-preview-tint';
-    preview.appendChild(tint);
     return preview;
   }
 
@@ -864,10 +1039,18 @@ function renderShop() {
     const card = document.createElement('div');
     card.className = 'shop-item';
 
-    const achievementLocked = hat.unlockType === 'spaceWins' && spaceWins < (hat.requiredWins || 0);
-    const owned = unlockedHats.has(hat.id);
+    const achievementLocked = (
+      (hat.unlockType === 'spaceWins' && spaceWins < (hat.requiredWins || 0))
+      || (hat.unlockType === 'achievement' && !unlockedAchievements.has(hat.requiredAchievement || ''))
+    );
+    const achievementOwned = hat.unlockType === 'achievement' && unlockedAchievements.has(hat.requiredAchievement || '');
+    const owned = unlockedHats.has(hat.id) || achievementOwned;
     const selected = selectedHat === hat.id;
-    const hatTintColor = hatColorOverrides[hat.id] || hat.color || '#ffffff';
+    const hasCustomHatColor = Object.prototype.hasOwnProperty.call(hatColorOverrides, hat.id);
+    const defaultHatColor = hat.color || '#ffffff';
+    const hatTintColor = hasCustomHatColor
+      ? hatColorOverrides[hat.id]
+      : (hat.id === 'top' ? null : defaultHatColor);
     const previewLocked = hat.id !== 'none' && (!owned || achievementLocked);
 
     const previewEl = createHatPreview(hat.id, hatTintColor, previewLocked);
@@ -884,6 +1067,13 @@ function renderShop() {
       price.textContent = winsLeft === 0
         ? `${unlockAchievementName} unlocked (${spaceWins}/${hat.requiredWins})`
         : `${unlockAchievementName}: Reach Space ${hat.requiredWins}x (${spaceWins}/${hat.requiredWins})`;
+    } else if (hat.unlockType === 'achievement') {
+      const reqAchievement = achievementCatalog[hat.requiredAchievement || ''];
+      const reqName = reqAchievement?.name || 'Achievement';
+      const reqProgress = getAchievementCardStatus(hat.requiredAchievement || '', reqAchievement);
+      price.textContent = unlockedAchievements.has(hat.requiredAchievement || '')
+        ? `${reqName} unlocked`
+        : `${reqName}: ${reqProgress}`;
     } else {
       price.textContent = hat.cost === 0 ? 'Free' : `${hat.cost} coins`;
     }
@@ -897,7 +1087,9 @@ function renderShop() {
       const colorInput = document.createElement('input');
       colorInput.className = 'hat-color-input';
       colorInput.type = 'color';
-      colorInput.value = hatTintColor;
+      colorInput.value = hasCustomHatColor
+        ? hatColorOverrides[hat.id]
+        : (hat.id === 'top' ? '#ffffff' : defaultHatColor);
       colorInput.disabled = !owned || achievementLocked;
       colorInput.title = owned ? 'Choose hat color' : 'Buy or unlock this hat first';
       colorInput.addEventListener('input', () => {
@@ -908,6 +1100,11 @@ function renderShop() {
 
       colorWrap.appendChild(colorInput);
       card.appendChild(colorWrap);
+    } else {
+      const colorSpacer = document.createElement('div');
+      colorSpacer.className = 'hat-color-wrap hat-color-wrap-empty';
+      colorSpacer.textContent = 'Color';
+      card.appendChild(colorSpacer);
     }
 
     const btn = document.createElement('button');
@@ -920,7 +1117,7 @@ function renderShop() {
     }
     btn.addEventListener('click', () => {
       if (achievementLocked) return;
-      const hasHat = unlockedHats.has(hat.id);
+      const hasHat = unlockedHats.has(hat.id) || (hat.unlockType === 'achievement' && unlockedAchievements.has(hat.requiredAchievement || ''));
       if (!hasHat && coinBalance < hat.cost) {
         showWarningModal('Insufficient Funds', 'Insufficient Funds', () => {});
         return;
@@ -943,13 +1140,18 @@ function renderShop() {
 
 function getAchievementCardStatus(id, achievement) {
   if (id === 'first_coin') return `${Math.min(coinBalance, 1)}/1`;
-  if (id === 'coin_hoarder') return `${Math.min(coinBalance, 25)}/25`;
+  if (id === 'coin_hoarder') return `${Math.min(coinBalance, 1000)}/1000`;
   if (id === 'coin_centurion') return `${Math.min(coinBalance, 100)}/100`;
   if (id === 'first_win') return `${Math.min(spaceWins, 1)}/1`;
+  if (id === 'triple_top') return `${Math.min(spaceWins, 3)}/3`;
   if (id === 'crown_unlock') return `${Math.min(spaceWins, 10)}/10`;
   if (id === 'hat_collector') return Array.from(unlockedHats).filter((h) => h !== 'none').length >= 1 ? 'Done' : '0/1';
   if (id === 'hat_trio') return `${Math.min(Array.from(unlockedHats).filter((h) => h !== 'none').length, 3)}/3`;
-  if (id === 'hat_master') return `${Math.min(Array.from(unlockedHats).filter((h) => h !== 'none').length, 4)}/4`;
+  if (id === 'hat_master') {
+    const maxHats = Math.max(1, hatCatalog.length - 1);
+    const ownedHats = Array.from(unlockedHats).filter((h) => h !== 'none').length;
+    return `${Math.min(ownedHats, maxHats)}/${maxHats}`;
+  }
   if (id === 'secret_found') return secretUnlocked ? 'Done' : 'Locked';
   return achievement && unlockedAchievements.has(id) ? 'Done' : 'Locked';
 }
@@ -1012,7 +1214,7 @@ function closeShop() {
   shopOverlay.classList.remove('active');
 }
 
-function drawHatAt(x, y, w, h) {
+function drawHatAt(x, y, w, h, posture = null) {
   if (selectedHat === 'none') return;
   const hatTintColor = hatColorOverrides[selectedHat] || null;
 
@@ -1027,26 +1229,64 @@ function drawHatAt(x, y, w, h) {
     const sourceSw = (maskedBase || tintedSource) ? source.width : frame.sw;
     const sourceSh = (maskedBase || tintedSource) ? source.height : frame.sh;
     const placement = getHatPlacement(selectedHat);
+    const crouchOrCrawl = !!(posture && posture.isCrouching);
+    const walking = !!(posture && posture.isWalking) && !crouchOrCrawl;
+    const xOffsetRatio = crouchOrCrawl
+      ? (placement.crouchXOffset ?? (placement.xOffset + 0.085))
+      : walking
+        ? (placement.walkXOffset ?? placement.xOffset)
+      : placement.xOffset;
+    const bottomYRatio = crouchOrCrawl
+      ? (placement.crouchBottomYRatio ?? (placement.bottomYRatio + 0.11))
+      : walking
+        ? (placement.walkBottomYRatio ?? placement.bottomYRatio)
+      : placement.bottomYRatio;
     const maxW = Math.round(w * placement.widthRatio);
     const maxH = Math.round(h * placement.heightRatio);
     const scale = Math.min(maxW / sourceSw, maxH / sourceSh);
     const drawW = Math.max(8, Math.round(sourceSw * scale));
     const drawH = Math.max(8, Math.round(sourceSh * scale));
+    const facingSign = player.facingRight ? 1 : -1;
     // Keep hats attached to the head side by making horizontal offset follow facing direction.
-    const facingOffset = (player.facingRight ? 1 : -1) * (w * placement.xOffset);
+    const facingOffset = facingSign * (w * xOffsetRatio);
     let drawX = Math.round(x + (w - drawW) / 2 + facingOffset);
     const spritePixelScale = drawW / frame.sw;
-    if (selectedHat === 'cap') {
-      // Move cap further left for better head alignment.
-      drawX -= Math.round(spritePixelScale * 12);
-    } else if (selectedHat === 'crown') {
-      // Nudge crown right slightly.
-      drawX += Math.round(spritePixelScale * 3);
+    let fineNudgePx = 0;
+    if (crouchOrCrawl) {
+      fineNudgePx = Number.isFinite(placement.crouchFineNudgePx)
+        ? placement.crouchFineNudgePx
+        : Number.isFinite(placement.standFineNudgePx)
+          ? placement.standFineNudgePx
+          : 0;
+    } else if (walking) {
+      fineNudgePx = Number.isFinite(placement.walkFineNudgePx)
+        ? placement.walkFineNudgePx
+        : Number.isFinite(placement.standFineNudgePx)
+          ? placement.standFineNudgePx
+          : 0;
+    } else {
+      fineNudgePx = Number.isFinite(placement.standFineNudgePx)
+        ? placement.standFineNudgePx
+        : 0;
     }
-    const drawY = Math.round(y + (h * placement.bottomYRatio) - drawH);
+    if (!Number.isFinite(fineNudgePx) && selectedHat === 'crown') {
+      fineNudgePx = 3;
+    }
+    drawX += Math.round(spritePixelScale * fineNudgePx * facingSign);
+    let drawY = Math.round(y + (h * bottomYRatio) - drawH);
+    const yNudgePx = crouchOrCrawl
+      ? (placement.crouchFineYNudgePx ?? 0)
+      : walking
+        ? (placement.walkFineYNudgePx ?? 0)
+        : (placement.standFineYNudgePx ?? 0);
+    if (Number.isFinite(yNudgePx)) {
+      drawY += Math.round(spritePixelScale * yNudgePx);
+    }
+    if (walking && posture && posture.walkFrame === 1) {
+      drawY += Math.max(1, Math.round(spritePixelScale * 2));
+    }
     const shouldFaceRight = player.facingRight;
-    // Cap uses opposite orientation from previous tuning so the thin strap side stays at the cat's back.
-    const drawFacingRight = selectedHat === 'cap' ? shouldFaceRight : shouldFaceRight;
+    const drawFacingRight = shouldFaceRight;
     ctx.save();
     if (drawFacingRight) {
       ctx.drawImage(source, sourceSx, sourceSy, sourceSw, sourceSh, drawX, drawY, drawW, drawH);
@@ -1264,6 +1504,7 @@ function saveProgress() {
     lives,
     coinBalance,
     spaceWins,
+    crownCoinMultiplier,
     selectedHat,
     unlockedHats: Array.from(unlockedHats),
     hatColorOverrides: { ...hatColorOverrides },
@@ -1293,6 +1534,7 @@ function restoreProgress() {
   lives = savedProgress.lives;
   coinBalance = savedProgress.coinBalance || 0;
   spaceWins = savedProgress.spaceWins || 0;
+  crownCoinMultiplier = Math.max(3, savedProgress.crownCoinMultiplier || 3);
   selectedHat = savedProgress.selectedHat || 'none';
   // Keep a title-screen unlock that happened after the last save.
   secretUnlocked = !!savedProgress.secretUnlocked || hadSecretUnlockedAlready;
@@ -1341,6 +1583,7 @@ function resetGame(keepProgress = false) {
   if (!keepProgress) {
     coinBalance = 0;
     spaceWins = 0;
+    crownCoinMultiplier = 3;
     selectedHat = 'none';
     unlockedHats.clear();
     unlockedHats.add('none');
@@ -1590,7 +1833,7 @@ function createStars() {
 }
 
 function loadAssets(basePath = 'assets') {
-  const ASSET_REV = '2026-06-29-icy-refresh';
+  const ASSET_REV = '2026-06-29-hats-refresh-3';
   const withAssetRev = (src) => `${encodeAssetPath(src)}${src.includes('?') ? '&' : '?'}v=${ASSET_REV}`;
   const load = (src) => new Promise((res) => {
     const img = new Image();
@@ -1639,13 +1882,33 @@ function loadAssets(basePath = 'assets') {
       `${basePath}/${spriteFilePaths.hats.wizard}`,
     ]).then((i) => (assets.hatWitch = i)),
     loadFirstPaths([
+      spriteFilePaths.hats.top,
+      `${basePath}/${spriteFilePaths.hats.top}`,
+    ]).then((i) => (assets.hatTop = i)),
+    loadFirstPaths([
+      spriteFilePaths.hats.chef,
+      `${basePath}/${spriteFilePaths.hats.chef}`,
+    ]).then((i) => (assets.hatChef = i)),
+    loadFirstPaths([
+      spriteFilePaths.hats.cowboy,
+      `${basePath}/${spriteFilePaths.hats.cowboy}`,
+    ]).then((i) => (assets.hatCowboy = i)),
+    loadFirstPaths([
+      spriteFilePaths.hats.straw,
+      `${basePath}/${spriteFilePaths.hats.straw}`,
+    ]).then((i) => (assets.hatStraw = i)),
+    loadFirstPaths([
       'Vibe Coding Assets (3) #8 Small Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #8 Small Grass Platform.png`,
     ]).then((i) => (assets.grassSmall = i)),
     loadFirstPaths([
       'Vibe Coding Assets (3) #12 Icy Small Grass Platform New.png',
+      'Assets/Vibe Coding Assets (3) #12 Icy Small Grass Platform New.png',
+      'assets/Vibe Coding Assets (3) #12 Icy Small Grass Platform New.png',
       `${basePath}/Vibe Coding Assets (3) #12 Icy Small Grass Platform New.png`,
       'Vibe Coding Assets (3) #12 Icy Small Grass Platform.png',
+      'Assets/Vibe Coding Assets (3) #12 Icy Small Grass Platform.png',
+      'assets/Vibe Coding Assets (3) #12 Icy Small Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #12 Icy Small Grass Platform.png`,
     ]).then((i) => (assets.iceGrassSmall = i)),
     // Name correction: file labeled #10 Large is the medium platform art.
@@ -1655,8 +1918,12 @@ function loadAssets(basePath = 'assets') {
     ]).then((i) => (assets.grassMedium = i)),
     loadFirstPaths([
       'Vibe Coding Assets (3) #13 Icy Medium Grass Platform New.png',
+      'Assets/Vibe Coding Assets (3) #13 Icy Medium Grass Platform New.png',
+      'assets/Vibe Coding Assets (3) #13 Icy Medium Grass Platform New.png',
       `${basePath}/Vibe Coding Assets (3) #13 Icy Medium Grass Platform New.png`,
       'Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png',
+      'Assets/Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png',
+      'assets/Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #13 Icy Medium Grass Platform.png`,
     ]).then((i) => (assets.iceGrassMedium = i)),
     // Prefer the newly uploaded large platform art, with the older file as fallback.
@@ -1668,8 +1935,12 @@ function loadAssets(basePath = 'assets') {
     ]).then((i) => (assets.grassLarge = i)),
     loadFirstPaths([
       'Vibe Coding Assets (3) #14 Icy Large Grass Platform New.png',
+      'Assets/Vibe Coding Assets (3) #14 Icy Large Grass Platform New.png',
+      'assets/Vibe Coding Assets (3) #14 Icy Large Grass Platform New.png',
       `${basePath}/Vibe Coding Assets (3) #14 Icy Large Grass Platform New.png`,
       'Vibe Coding Assets (3) #14 Icy Large Grass Platform.png',
+      'Assets/Vibe Coding Assets (3) #14 Icy Large Grass Platform.png',
+      'assets/Vibe Coding Assets (3) #14 Icy Large Grass Platform.png',
       `${basePath}/Vibe Coding Assets (3) #14 Icy Large Grass Platform.png`,
     ]).then((i) => (assets.iceGrassLarge = i)),
     loadFirstPaths([
@@ -1762,6 +2033,9 @@ function startGame() {
 function winGame() {
   endGuidedTutorial();
   spaceWins += 1;
+  if (selectedHat === 'crown') {
+    crownCoinMultiplier *= 3;
+  }
   syncAchievementUnlocks();
   unlockAchievementsByState(true);
   gameState = 'win';
@@ -2033,7 +2307,7 @@ function drawCat() {
       ctx.drawImage(sprite, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
     }
     ctx.restore();
-    drawHatAt(drawX, drawY, drawW, drawH);
+    drawHatAt(drawX, drawY, drawW, drawH, { isCrouching: manualSit, isWalking: moving && !manualSit, walkFrame });
     return;
   }
 
@@ -2084,7 +2358,7 @@ function drawCat() {
   ctx.fillRect(-24, 10, 14, 14);
   ctx.fillRect(10, 10, 14, 14);
   ctx.restore();
-  drawHatAt(fx, fy, w, h);
+  drawHatAt(fx, fy, w, h, { isCrouching: manualSit, isWalking: moving && !manualSit, walkFrame });
 }
 
 function applyPhysics() {
@@ -2220,7 +2494,8 @@ function applyPhysics() {
     const overlapY = Math.abs((player.y + player.height / 2) - coin.y) < (player.height / 2 + 7);
     if (overlapX && overlapY) {
       coin.collected = true;
-      coinBalance += 1;
+      const coinGain = selectedHat === 'crown' ? crownCoinMultiplier : 1;
+      coinBalance += coinGain;
       spawnCoinBurst(coin.x, coin.y);
       playCoinSfx();
       updateCoinsHUD();
@@ -2376,7 +2651,7 @@ if (introBtn) {
 }
 if (secretBtn) {
   secretBtn.addEventListener('click', () => {
-    showSecretPanel();
+    showAdminPanel();
   });
 }
 if (backBtn) {
@@ -2508,11 +2783,56 @@ if (secretCoinApplyBtn) {
     const amount = clamp(rounded, 0, 1000000);
     coinBalance += amount;
     updateCoinsHUD();
+    unlockAchievementsByState(true);
     if (secretPanelError) {
       secretPanelError.style.color = '#ffed61';
       secretPanelError.textContent = `${amount} coins added.`;
     }
     secretCoinInput.value = '';
+  });
+}
+
+if (adminUnlockAllHatsBtn) {
+  adminUnlockAllHatsBtn.addEventListener('click', () => {
+    unlockAllHats();
+  });
+}
+
+if (adminUnlockAllAchievementsBtn) {
+  adminUnlockAllAchievementsBtn.addEventListener('click', () => {
+    unlockAllAchievements();
+  });
+}
+
+if (adminPanelCloseBtn) {
+  adminPanelCloseBtn.addEventListener('click', () => {
+    hideAdminPanel();
+  });
+}
+
+if (adminCoinApplyBtn) {
+  adminCoinApplyBtn.addEventListener('click', () => {
+    if (!adminCoinInput) return;
+    const raw = adminCoinInput.value.trim();
+    const parsed = Number(raw);
+    if (!raw || !Number.isFinite(parsed)) {
+      if (adminCoinError) {
+        adminCoinError.style.color = '#ffd68f';
+        adminCoinError.textContent = 'Enter a valid number.';
+      }
+      return;
+    }
+
+    const rounded = Math.round(parsed);
+    const amount = clamp(rounded, 0, 1000000);
+    coinBalance += amount;
+    updateCoinsHUD();
+    unlockAchievementsByState(true);
+    if (adminCoinError) {
+      adminCoinError.style.color = '#ffed61';
+      adminCoinError.textContent = `${amount} coins added.`;
+    }
+    adminCoinInput.value = '';
   });
 }
 
